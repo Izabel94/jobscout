@@ -7,10 +7,8 @@ from pydantic import BaseModel, Field
 
 
 class Source(StrEnum):
-    UPWORK = "upwork"
-    BUNDESAGENTUR = "bundesagentur"
-    FREELANCERMAP = "freelancermap"
     LINKEDIN = "linkedin"
+    INDEED = "indeed"
 
 
 class ListingStatus(StrEnum):
@@ -30,6 +28,27 @@ class RateUnit(StrEnum):
     FIXED = "fixed"
     SALARY = "salary"
     UNKNOWN = "unknown"
+
+
+class Arrangement(StrEnum):
+    REMOTE = "remote"
+    HYBRID = "hybrid"
+    ONSITE = "onsite"
+    UNKNOWN = "unknown"
+
+
+class JobType(StrEnum):
+    FULLTIME = "fulltime"
+    PERMANENT = "permanent"
+    CONTRACT = "contract"
+    PARTTIME = "parttime"
+    INTERN = "intern"
+    UNKNOWN = "unknown"
+
+
+class ApplyMethod(StrEnum):
+    EXTERNAL_APPLY = "external_apply"
+    EASY_APPLY = "easy_apply"
 
 
 class Listing(BaseModel):
@@ -55,6 +74,11 @@ class Listing(BaseModel):
     score_rationale: str | None = None
     spam_score: int | None = None
     status: ListingStatus = ListingStatus.NEW
+    arrangement: Arrangement | None = None
+    arrangement_evidence: str | None = None
+    job_type_classified: JobType | None = None
+    job_type_evidence: str | None = None
+    apply_method: ApplyMethod | None = None
 
 
 class Draft(BaseModel):
