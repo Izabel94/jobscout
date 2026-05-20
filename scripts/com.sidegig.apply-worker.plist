@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sidegig.apply-worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/izabelcvetkovic/projects/sidegig/scripts/apply-worker-local.sh</string>
+  </array>
+
+  <!-- Poll every 5 minutes. Counts from agent load time; after Mac
+       reboot the schedule may shift by a few minutes. Acceptable. -->
+  <key>StartInterval</key>
+  <integer>300</integer>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SIDEGIG_REPO</key>
+    <string>/Users/izabelcvetkovic/projects/sidegig</string>
+    <key>POETRY_BIN</key>
+    <string>/opt/homebrew/bin/poetry</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/sbin:/usr/bin:/bin</string>
+    <key>DYLD_FALLBACK_LIBRARY_PATH</key>
+    <string>/opt/homebrew/lib</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/izabelcvetkovic/.cache/sidegig/launchd/apply-worker.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/izabelcvetkovic/.cache/sidegig/launchd/apply-worker.launchd.log</string>
+
+  <key>AbandonProcessGroup</key>
+  <false/>
+</dict>
+</plist>

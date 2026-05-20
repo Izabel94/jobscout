@@ -1,0 +1,142 @@
+name: daily
+
+# Daily cron over the sources that work in CI:
+#   - bundesagentur   (httpx, no auth)
+#   - linkedin        (JobSpy; works logged-out, optional cookie via secret)
+#   - freelancermap   (Playwright headless, optional cookie via secret)
+#
+# Upwork is intentionally NOT in this workflow. Its Cloudflare Turnstile
+# blocks Playwright Chromium regardless of stealth, so the only path that
+# works is CDP-attaching to the user's real Chrome. That can't run on a
+# GHA runner. The macOS `launchd` job in scripts/com.sidegig.upwork-discover.plist
+# handles Upwork locally instead.
+
+on:
+  schedule:
+    - cron: "50 9 * * *"  # 09:50 UTC = 10:50 / 11:50 Berlin local depending on DST
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [bundesagentur, linkedin, freelancermap]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry
+      - run: poetry install --no-interaction
+
+      # Freelancermap drives Playwright with headless Chromium — install
+      # browsers once. Bundesagentur and LinkedIn are pure httpx and don't
+      # need this, but the install is fast and the conditional logic
+      # isn't worth the workflow complexity.
+      - name: Install Playwright Chromium
+        if: matrix.source == 'freelancermap'
+        run: poetry run playwright install --with-deps chromium
+
+      # Restore session cookies for sources that need auth. Stored as
+      # base64-encoded secrets so the multi-line JSON doesn't break YAML.
+      # Each is optional — the script falls back to logged-out scraping.
+      - name: Restore freelancermap session profile
+        if: matrix.source == 'freelancermap' && env.FREELANCERMAP_PROFILE_B64 != ''
+        env:
+          FREELANCERMAP_PROFILE_B64: ${{ secrets.FREELANCERMAP_PROFILE_B64 }}
+        run: |
+          mkdir -p ~/.cache/sidegig/freelancermap-profile
+          echo "$FREELANCERMAP_PROFILE_B64" | base64 -d | tar -xzC ~/.cache/sidegig/freelancermap-profile
+
+      - name: Run discover for ${{ matrix.source }}
+        env:
+          SOURCE: ${{ matrix.source }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
+        run: poetry run python -m sidegig.discover --only "$SOURCE"
+
+  freshness:
+    # Sweep listings whose detail page now says "no longer accepting" /
+    # "Projekt nicht mehr aktuell" etc. Flips them to EXPIRED so they
+    # don't clog the pipeline. Cheap (HEAD/GET per pipeline listing).
+    needs: discover
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry
+      - run: poetry install --no-interaction
+      - name: Run freshness sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
+        run: poetry run python -m sidegig.freshness
+
+  filter:
+    needs: freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry
+      - run: poetry install --no-interaction
+      - name: Run filter
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: poetry run python -m sidegig.filter
+
+  score:
+    needs: filter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry
+      - run: poetry install --no-interaction
+      - name: Run score
+        env:
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: poetry run python -m sidegig.score
+
+      # Print a digest of new high-scoring listings to the GHA log. No
+      # email — user opted out. The digest script is still useful locally
+      # (e.g. `make digest` would read from cloud Supabase).
+      - name: Print digest to GHA log
+        if: always()
+        env:
+          PYTHONPATH: .
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NOTIFY_SCORE_FLOOR: "70"
+          NOTIFY_HOURS_BACK: "26"
+          UPSTREAM_FAILED: ${{ contains(needs.*.result, 'failure') }}
+        run: poetry run python scripts/build_email_digest.py

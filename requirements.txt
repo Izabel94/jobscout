@@ -1,0 +1,20 @@
+# Streamlit Cloud requirements — minimal subset of pyproject.toml deps
+# needed by the deployed dashboard. Heavy local-only deps (playwright,
+# weasyprint, jobspy, sentence-transformers, crawl4ai, pandas) are
+# intentionally excluded — those modules are imported lazily inside
+# `if not _SIDEGIG_DEPLOYED:` branches that never execute on cloud.
+#
+# Keep in sync with pyproject.toml when bumping any of the below.
+
+streamlit>=1.32,<2
+supabase>=2.0,<3
+google-genai>=1.0,<3
+pydantic>=2.10,<3
+python-dotenv>=1.0,<2
+PyYAML>=6.0,<7
+httpx>=0.27,<1
+beautifulsoup4>=4.12,<5
+typing-extensions>=4.0,<5
+# Intentionally NO lxml — Streamlit Cloud lacks libxml2-dev system packages
+# so lxml fails to build from sdist. BS4 falls back to stdlib `html.parser`.
+# Local installs (poetry, full pyproject.toml) still get lxml for speed.

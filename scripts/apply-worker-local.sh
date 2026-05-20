@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Local apply-worker, designed for macOS launchd.
+#
+# Polls cloud Supabase for pending apply_requests; runs the matching
+# per-source apply module against the user's CDP-attached Chrome.
+# Notifies on failure so silent crashes are visible.
+#
+# Install:
+#   cp scripts/com.sidegig.apply-worker.plist ~/Library/LaunchAgents/
+#   launchctl load ~/Library/LaunchAgents/com.sidegig.apply-worker.plist
+#
+# Manual smoke test:
+#   bash scripts/apply-worker-local.sh
+
+set -uo pipefail
+
+REPO_DIR="${SIDEGIG_REPO:-$HOME/projects/sidegig}"
+LOG_DIR="$HOME/.cache/sidegig/launchd"
+LOG_FILE="$LOG_DIR/apply-worker.log"
+CDP_PORT="${CDP_PORT:-9222}"
+
+# In-project venv; survives branch switches because .venv is gitignored.
+PYTHON="$REPO_DIR/.venv/bin/python"
+DOTENV="$REPO_DIR/.venv/bin/dotenv"
+
+mkdir -p "$LOG_DIR"
+
+notify() {
+  local title="$1" body="$2"
+  osascript -e "display notification \"$body\" with title \"$title\" sound name \"Funk\"" 2>/dev/null \
+    || echo "[notify-fallback] $title — $body" >> "$LOG_FILE"
+}
+
+ts() { date '+%Y-%m-%dT%H:%M:%S%z'; }
+
+echo "" >> "$LOG_FILE"
+echo "==== $(ts) apply-worker starting ====" >> "$LOG_FILE"
+
+# Cheap CDP probe — open a TCP connection to the debug port.
+# Skip silently if Chrome isn't up AND there are no pending rows. If
+# pending rows exist, surface a notification so the user knows.
+if ! lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  pending=$(
+    cd "$REPO_DIR" && \
+    "$DOTENV" run -- "$PYTHON" -c "
+from sidegig.db import list_apply_requests
+n = sum(1 for r in list_apply_requests(limit=50) if r['status'] == 'pending')
+print(n)
+" 2>/dev/null || echo 0
+  )
+  if [[ "${pending:-0}" -gt 0 ]]; then
+    notify "sidegig: $pending apply request(s) waiting" \
+      "Start Chrome with: bash scripts/chrome-cdp.sh"
+  fi
+  echo "$(ts) CDP Chrome down; pending=$pending — exiting" >> "$LOG_FILE"
+  # Intentional exit 0: don't pollute launchctl's last-exit-status with
+  # "Chrome not running" — that's a normal state for a 5-min poll.
+  # User already got a notification above if there were pending rows.
+  exit 0
+fi
+
+cd "$REPO_DIR" || { notify "sidegig apply-worker" "cd $REPO_DIR failed"; exit 1; }
+
+if [[ ! -x "$PYTHON" ]]; then
+  notify "sidegig apply-worker" "venv missing: $PYTHON — run \`poetry install\`"
+  exit 127
+fi
+
+# macOS SIP strips DYLD_* from the plist env, so set it here.
+# WeasyPrint needs homebrew's libgobject/pango/cairo on the dynamic lib path.
+export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib
+
+# Cap at 240s so a hung CDP call can't lock out the next 5-min tick.
+# Exit 124 = timeout, falls through to the failure-notification branch.
+UPWORK_CDP_URL="http://localhost:$CDP_PORT" \
+  gtimeout 240 "$DOTENV" run -- "$PYTHON" -m sidegig.apply.worker >> "$LOG_FILE" 2>&1
+status=$?
+
+if [[ $status -ne 0 ]]; then
+  tail_lines="$(tail -5 "$LOG_FILE" | tr '\n' ' ' | cut -c1-240)"
+  notify "sidegig apply-worker FAILED (exit $status)" "$tail_lines"
+  echo "$(ts) FAILED exit=$status" >> "$LOG_FILE"
+  exit "$status"
+fi
+
+echo "$(ts) OK" >> "$LOG_FILE"

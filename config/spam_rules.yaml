@@ -1,0 +1,140 @@
+# Spam detection rules — used by Hard Filter 1 (hard-drop patterns) and
+# soft scoring (signal weights). Patterns are regex unless noted otherwise.
+
+hard_drop_patterns:
+  upfront_fee:
+    - '\b(registration|starter|onboarding|training)\s*fee\b'
+    - '\bdeposit required\b'
+    - '\bpay\s*(for|to)\s*(software|tool|license|setup)\b'
+  unpaid_trial:
+    - '\bequity[- ]only\b'
+    - '\bsweat equity\b'
+    - '\b(rev|profit)[- ]share\b'
+    - '\bdeferred (comp(ensation)?|salary)\b'
+    - '\bunpaid (trial|test|task)\b'
+    - '\b(test|sample) (task|project) before payment\b'
+    - '\bpay (after|on) (launch|success|delivery|milestone)\b'
+  elaborate_application:
+    - '\btake[- ]home (task|assignment|test|challenge|exercise)\b'
+    - '\bcoding (challenge|test|exercise)\b'
+    - '\bsubmit (a |an )?(short |brief )?(intro |introduction )?video\b'
+    - '\bLoom (intro|introduction|video)\b'
+    - '\brecord (a |an )?(short |brief )?(intro|introduction|video)\b'
+    - '\b(screening|trial|audition) (project|exercise|assignment)\b'
+    - '\bassignment before (the )?interview\b'
+    - '\bcomplete (this|the) (challenge|task|exercise) to apply\b'
+    - '\b\d+[- ]?hour (task|assignment|test|challenge)\b'
+
+mlm_keywords:
+  - Vertriebspartner
+  - Strukturvertrieb
+  - Netzwerk-Marketing
+  - Empfehlungsmarketing
+  - 'nebenberuflich.*Vermögensaufbau'
+  - eigenes Business aufbauen
+  - Finanzberater ohne Ausbildung
+
+mlm_companies:
+  - DVAG
+  - Swiss Life Select
+  - ERGO Pro
+  - OVB
+  - Herbalife
+  - PM International
+  - Forever Living
+
+werkstudent_overload_threshold_hours: 20
+
+spam_score_drop_threshold: 5
+
+spam_score_weights:
+  rate_vs_scope_mismatch: 3
+  upwork_unverified_new_account: 3
+  ai_claim_with_rpa_stack: 2
+  short_listing_no_concrete: 2
+  autotranslation_artifacts: 2
+  duplicate_description_hash: 2
+  excessive_caps_emoji: 1
+  lowest_bidder_language: 1
+  recruiter_as_direct: 1
+  geo_restriction_hidden: 1
+
+positive_signal_weights:
+  named_tech_stack: -2
+  named_contact_linkedin: -2
+  payment_verified_history: -1
+  named_deliverables: -1
+
+scope_heavy_keywords:
+  - 'rag system'
+  - 'fine[- ]tune'
+  - 'multi[- ]agent'
+  - 'production pipeline'
+  - 'train (a|your|our) .* (llm|gpt|model)'
+  - 'retrieval augmented'
+
+b1_min_fixed_eur: 2000
+b1_min_hourly_eur: 50
+
+non_ai_stack_keywords:
+  - zapier
+  - 'make\.com'
+  - n8n
+  - 'excel macro'
+  - vba
+  - 'web scraping'
+  - 'data entry'
+  - 'copy[- ]paste'
+  - 'google sheets automation'
+
+autotranslation_patterns:
+  - '\bkindly\s+(do|please|revert|share)\b'
+  - '\bplease do the needful\b'
+  - '\bgreetings of the day\b'
+  - '\bbe advised that\b'
+  - '\binformations\b'
+  - '\bsince \d+ years\b'
+
+lowest_bidder_patterns:
+  - '\bbest rate\b'
+  - '\blowest (bid|price|rate)\b'
+  - '\bcheap(est)?\b'
+  - '\blow budget\b'
+  - '\btight budget\b'
+  - '\bstarting at \$?[0-9]{1,2}\b'
+
+named_stack_tokens:
+  - Python
+  - TypeScript
+  - JavaScript
+  - LangChain
+  - LangGraph
+  - LangSmith
+  - LlamaIndex
+  - Neo4j
+  - Postgres
+  - PostgreSQL
+  - Pinecone
+  - Qdrant
+  - Weaviate
+  - Anthropic
+  - OpenAI
+  - Hugging Face
+  - HuggingFace
+  - PyTorch
+  - TensorFlow
+  - Docker
+  - Kubernetes
+  - GCP
+  - AWS
+  - Azure
+
+known_recruiters:
+  - Hays
+  - Michael Page
+  - Robert Half
+  - GULP
+  - SOLCOM
+  - Computer Futures
+  - Modis
+  - Etengo

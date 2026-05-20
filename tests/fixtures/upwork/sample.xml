@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stub fixture. Replace with real signed-in Upwork RSS payload when available. -->
+<rss version="2.0">
+  <channel>
+    <title>Upwork - Jobs - Saved Search</title>
+    <link>https://www.upwork.com/ab/feed/jobs/rss</link>
+    <description>Worldwide Saved Search Results</description>
+    <language>en-us</language>
+    <pubDate>Wed, 14 May 2026 09:00:00 +0000</pubDate>
+    <item>
+      <title>Senior Python Backend Engineer for FastAPI service - Hourly</title>
+      <link>https://www.upwork.com/jobs/Senior-Python-Backend-Engineer-FastAPI_~01abc123def4567890</link>
+      <description><![CDATA[
+        <p>We need a senior backend engineer to extend our FastAPI service with async workers, Postgres migrations, and CI hardening.</p>
+        <b>Hourly Range</b>: $60 - $90 / hr<br />
+        <b>Posted On</b>: May 14, 2026 08:45 UTC<br />
+        <b>Category</b>: Web, Mobile & Software Dev > Web Development<br />
+        <b>Skills</b>: Python, FastAPI, PostgreSQL, Docker<br />
+        <b>Country</b>: United States
+        <br /><br />
+        <a href="https://www.upwork.com/jobs/Senior-Python-Backend-Engineer-FastAPI_~01abc123def4567890">click to apply</a>
+      ]]></description>
+      <pubDate>Wed, 14 May 2026 08:45:00 +0000</pubDate>
+      <guid isPermaLink="false">https://www.upwork.com/jobs/Senior-Python-Backend-Engineer-FastAPI_~01abc123def4567890</guid>
+    </item>
+    <item>
+      <title>Build a Next.js marketing site - Fixed Price</title>
+      <link>https://www.upwork.com/jobs/Build-Nextjs-marketing-site_~02b1c2d3e4f5a6b7c8</link>
+      <description><![CDATA[
+        <p>Looking to build a small marketing site (5-7 pages) with Next.js 15, Tailwind, and Sanity CMS.</p>
+        Budget: $1500<br />
+        <b>Posted On</b>: May 14, 2026 07:30 UTC<br />
+        <b>Category</b>: Web, Mobile & Software Dev > Web Development<br />
+        <b>Skills</b>: Next.js, TypeScript, Tailwind CSS, Sanity<br />
+        <b>Country</b>: Germany
+        <br /><br />
+        <a href="https://www.upwork.com/jobs/Build-Nextjs-marketing-site_~02b1c2d3e4f5a6b7c8">click to apply</a>
+      ]]></description>
+      <pubDate>Wed, 14 May 2026 07:30:00 +0000</pubDate>
+      <guid isPermaLink="false">https://www.upwork.com/jobs/Build-Nextjs-marketing-site_~02b1c2d3e4f5a6b7c8</guid>
+    </item>
+    <item>
+      <title>AI engineer needed for prompt evaluation tooling</title>
+      <link>https://www.upwork.com/jobs/AI-engineer-prompt-evaluation_~03c2d3e4f5a6b7c8d9</link>
+      <description><![CDATA[
+        <p>We need help designing an internal evaluation harness for LLM prompts. Open to hourly or fixed; please propose what works for you.</p>
+        <b>Posted On</b>: May 14, 2026 06:15 UTC<br />
+        <b>Category</b>: Data Science & Analytics > AI & Machine Learning<br />
+        <b>Skills</b>: Python, LLM, Evaluation, Prompt Engineering<br />
+        <b>Country</b>: Worldwide
+        <br /><br />
+        <a href="https://www.upwork.com/jobs/AI-engineer-prompt-evaluation_~03c2d3e4f5a6b7c8d9">click to apply</a>
+      ]]></description>
+      <pubDate>Wed, 14 May 2026 06:15:00 +0000</pubDate>
+      <guid isPermaLink="false">https://www.upwork.com/jobs/AI-engineer-prompt-evaluation_~03c2d3e4f5a6b7c8d9</guid>
+    </item>
+  </channel>
+</rss>

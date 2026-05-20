@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editors
+.DS_Store
+.idea/
+.vscode/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Data
+*.sqlite
+*.db
+
+# Tooling caches
+.coverage
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+sentence_transformers_cache/
+weasyprint_cache/
+*.pdf
+
+# Supabase local stack
+supabase/.branches/
+supabase/.temp/
+
+# Playwright MCP scratch (UI inspection artifacts)
+.playwright-mcp/
+*.png
+!docs/**/*.png
+
+# Personal CV photo — keep out of version control
+config/profile_photo.*
+
+# Personal CV files — kept locally only, mirrored into Streamlit Cloud secrets (CV_BASE_EN, CV_BASE_DE)
+config/cv_base_en.md
+config/cv_base_de.md

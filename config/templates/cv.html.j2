@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 18mm 16mm;
+    }
+
+    body {
+      font-family: "Helvetica", "Arial", sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
+      color: #222;
+      text-align: justify;
+      hyphens: auto;
+    }
+
+    /* ── Header band ──────────────────────────────────────────────────────
+       Photo is absolute-positioned in the top-right corner so it floats over
+       the row without shrinking the name+contact column. That lets the name
+       center on the FULL page width (like the source CV) instead of being
+       offset by the photo. min-height matches the photo so the body content
+       starts cleanly below it. */
+    .cv-header {
+      position: relative;
+      min-height: 22mm;  /* matches photo height so SUMMARY starts cleanly below it */
+      margin: 0 0 2mm;
+    }
+    .cv-header-text {
+      padding-right: 25mm;  /* leave room for the photo so long titles don't collide */
+    }
+    .cv-header-photo {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 18mm;
+      height: 22mm;
+      object-fit: cover;
+      border-radius: 1mm;
+    }
+
+    /* Name (h1) — bold, uppercase, centered */
+    h1 {
+      font-size: 13pt;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      text-align: center;
+      margin: 0 0 1mm;
+      color: #1a1a1a;
+    }
+
+    /* Contact line (paragraph directly after h1, inside .cv-header-text) */
+    .cv-header-text > p {
+      text-align: center;
+      font-size: 9pt;
+      color: #444;
+      margin: 0;
+    }
+
+    /* ── Section heading — full-width underline ────────────────────────── */
+    h2 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #1a1a1a;
+      border-bottom: 0.8pt solid #1a1a1a;
+      padding-bottom: 1pt;
+      margin: 4mm 0 2mm;
+      text-align: left;
+    }
+
+    /* ── Entry header — `### Company | Location` -> two columns ────────── */
+    h3 {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 10pt;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 2.5mm 0 0.3mm;
+      text-align: left;
+    }
+    h3 .header-meta {
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    /* ── Role line (paragraph between h3 and bullets) ──────────────────── */
+    h3 + p {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 9.5pt;
+      margin: 0 0 1mm;
+      color: #333;
+      text-align: left;
+    }
+    h3 + p strong { font-weight: 400; color: #333; }
+    h3 + p em { font-style: normal; color: #333; }
+
+    /* ── Bullets — justified body text ─────────────────────────────────── */
+    ul {
+      margin: 0.5mm 0 2mm 0;
+      padding-left: 4.5mm;
+    }
+    li {
+      margin: 0.4mm 0;
+      text-align: justify;
+      hyphens: auto;
+    }
+
+    /* Free-standing summary paragraphs (under SUMMARY, EDUCATION blurbs) */
+    p {
+      text-align: justify;
+      hyphens: auto;
+      margin: 0.6mm 0 1.5mm;
+    }
+
+    /* Inline emphasis kept simple */
+    strong { color: #1a1a1a; }
+    em { color: #444; }
+    a { color: #1a5ad8; text-decoration: none; word-break: break-word; }
+
+    /* Skills/Languages/Awards block — tighter leading */
+    h2 + p, h2 + p + p, h2 + p + p + p, h2 + p + p + p + p {
+      margin: 0.8mm 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="cv-header">
+    <div class="cv-header-text">{{ header_html|safe }}</div>
+    {% if photo_data_uri %}<img class="cv-header-photo" src="{{ photo_data_uri }}" alt="">{% endif %}
+  </div>
+  {{ body_html|safe }}
+</body>
+</html>
