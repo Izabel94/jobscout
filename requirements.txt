@@ -1,8 +1,8 @@
 # Streamlit Cloud requirements — minimal subset of pyproject.toml deps
 # needed by the deployed dashboard. Heavy local-only deps (playwright,
-# weasyprint, jobspy, sentence-transformers, crawl4ai, pandas) are
-# intentionally excluded — those modules are imported lazily inside
-# `if not _SIDEGIG_DEPLOYED:` branches that never execute on cloud.
+# jobspy, sentence-transformers, pandas, notify-py) are intentionally
+# excluded — those modules are imported lazily inside
+# `if not _JOBSCOUT_DEPLOYED:` branches that never execute on cloud.
 #
 # Keep in sync with pyproject.toml when bumping any of the below.
 
