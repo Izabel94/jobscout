@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from jobscout.config_loader import load_profile
+from jobscout.config_loader import clear_profile_cache, load_profile
+from jobscout.db import upsert_profile
 
 _MAX_SEARCH_TERMS = 5
 
@@ -153,3 +154,40 @@ def render_profile_snapshot() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
+
+
+def save_profile_changes(pending: dict) -> None:
+    """Pure: upsert pending profile dict to DB + clear cache. Extracted from
+    the UI for testability."""
+    upsert_profile(pending)
+    clear_profile_cache()
+
+
+def render_save_bar() -> None:
+    if "pending_profile" not in st.session_state:
+        return
+    pending = st.session_state["pending_profile"]
+    col_l, col_r = st.columns([6, 2])
+    with col_r:
+        sub_l, sub_r = st.columns(2)
+        with sub_l:
+            if st.button("Discard", key="discard", use_container_width=True):
+                st.session_state.pop("pending_profile", None)
+                st.rerun()
+        with sub_r:
+            if st.button("Save changes", key="save", type="primary", use_container_width=True):
+                save_profile_changes(pending)
+                st.session_state.pop("pending_profile", None)
+                st.toast("Saved.", icon="✓")
+                st.rerun()
+
+
+def render() -> None:
+    """Orchestrate the full Settings tab — 5 cards + snapshot + save bar."""
+    render_search_terms_card()
+    render_arrangement_card()
+    render_title_denylist_card()
+    render_scorer_notes_card()
+    render_salary_card()
+    render_profile_snapshot()
+    render_save_bar()

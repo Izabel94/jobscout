@@ -11,14 +11,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 import streamlit as st
 
-from jobscout.ui.settings import (
-    render_arrangement_card,
-    render_profile_snapshot,
-    render_salary_card,
-    render_scorer_notes_card,
-    render_search_terms_card,
-    render_title_denylist_card,
-)
+from jobscout.ui.settings import render
 from jobscout.ui.styles import inject as inject_styles
 
 
@@ -26,12 +19,7 @@ def main():
     st.set_page_config(page_title="settings test", layout="wide")
     inject_styles()
     st.title("Settings tab smoke")
-    render_search_terms_card()
-    render_arrangement_card()
-    render_title_denylist_card()
-    render_scorer_notes_card()
-    render_salary_card()
-    render_profile_snapshot()
+    render()
 
 
 main()
