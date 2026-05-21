@@ -4,13 +4,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-import httpx
-from bs4 import BeautifulSoup, FeatureNotFound
-
 from jobscout.config_loader import load_cv_markdown, load_profile
 from jobscout.db import update_listing_status, write_draft
 from jobscout.llm import call_text
-from jobscout.models import Draft, Listing, ListingStatus, Source
+from jobscout.models import Draft, Listing, ListingStatus
+
+_MODEL_DRAFT = "gemini-2.5-flash"  # spec decision
+_PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
 _PROMPT_PROP = (_PROMPTS_DIR / "draft_proposal.v1.md").read_text(encoding="utf-8")
@@ -18,12 +18,14 @@ _PROMPT_CV = (_PROMPTS_DIR / "draft_cv.v1.md").read_text(encoding="utf-8")
 
 
 def _profile_blurb(profile: dict[str, Any]) -> str:
-    skills = ", ".join(profile["required_skill_keywords"][:10])
-    return f"{profile['name']} — AI Engineer (Hamburg). Stack: {skills}"
+    skills = ", ".join((profile.get("required_skill_keywords") or [])[:10])
+    name = profile.get("full_name") or ""
+    return f"{name} — AI Engineer (Hamburg). Stack: {skills}"
 
 
 def _case_studies(profile: dict[str, Any]) -> str:
-    return "\n\n".join(f"- {c['title']}: {c['summary']}" for c in profile["anchor_case_studies"])
+    summaries = profile.get("anchor_summaries") or []
+    return "\n\n".join(f"- {c['title']}: {c['summary']}" for c in summaries)
 
 
 def _extract_entry_headers(cv_md: str) -> list[str]:
@@ -40,28 +42,6 @@ _CONTACT_RE = re.compile(
 def _extract_contact_name(text: str) -> str:
     match = _CONTACT_RE.search(text or "")
     return match.group(1).strip() if match else ""
-
-
-def _fetch_freelancermap_contact(listing_url: str) -> str:
-    """Best-effort fetch of the Ansprechpartner span on a freelancermap detail page."""
-    try:
-        with httpx.Client(timeout=15.0, follow_redirects=True) as c:
-            r = c.get(listing_url, headers={"User-Agent": "jobscout/0.1 (+contact mining)"})
-            r.raise_for_status()
-    except (httpx.HTTPError, OSError):
-        return ""
-    # Streamlit Cloud's image lacks libxml2-dev, so lxml may be absent there.
-    try:
-        soup = BeautifulSoup(r.content, "lxml")
-    except FeatureNotFound:
-        soup = BeautifulSoup(r.content, "html.parser")
-    name_span = soup.select_one("span.project-info-name")
-    if name_span is not None:
-        # Separator handles "First<br>Last"; collapse double spacing.
-        name = " ".join(name_span.get_text(" ", strip=True).split())
-        if name:
-            return name
-    return ""
 
 
 def _verify_cv_facts(cv_base_md: str, adapted_md: str) -> list[str]:
@@ -84,14 +64,11 @@ def draft_one(listing: Listing) -> Draft:
     cv_language = listing.language or "en"
     cv_base_md = load_cv_markdown(cv_language)
 
-    # freelancermap card descriptions don't carry the Ansprechpartner — fetch the detail page on demand.
     contact_name = _extract_contact_name(listing.description or "")
-    if not contact_name and listing.source == Source.FREELANCERMAP:
-        contact_name = _fetch_freelancermap_contact(listing.url)
 
     rendered_prop = (
         _PROMPT_PROP.replace("{{profile_blurb}}", _profile_blurb(profile))
-        .replace("{{candidate_name}}", str(profile.get("name", "")))
+        .replace("{{candidate_name}}", str(profile.get("full_name") or ""))
         .replace("{{anchor_case_studies}}", _case_studies(profile))
         .replace("{{title}}", listing.title)
         .replace("{{description}}", (listing.description or "")[:4000])
@@ -102,10 +79,9 @@ def draft_one(listing: Listing) -> Draft:
         "{{listing_full}}", f"{listing.title}\n\n{listing.description or ''}"
     )
 
-    model = profile["model_draft"]
-    body = call_text(model=model, system="You write proposals.", user=rendered_prop, max_tokens=800)
+    body = call_text(model=_MODEL_DRAFT, system="You write proposals.", user=rendered_prop, max_tokens=800)
     cv_md = call_text(
-        model=model,
+        model=_MODEL_DRAFT,
         system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
         user=rendered_cv,
         max_tokens=6000,
@@ -122,10 +98,8 @@ def draft_one(listing: Listing) -> Draft:
         language=cv_language,
         body=body,
         adapted_cv=cv_md,
-        model=model,
-        prompt_version=(
-            f"prop:{profile['prompt_versions']['draft_proposal']};cv:{profile['prompt_versions']['draft_cv']}"
-        ),
+        model=_MODEL_DRAFT,
+        prompt_version=f"prop:{_PROMPT_VERSIONS['draft_proposal']};cv:{_PROMPT_VERSIONS['draft_cv']}",
     )
     write_draft(draft)
     update_listing_status(listing.id, ListingStatus.DRAFTED)

@@ -1,20 +1,5 @@
 """Listing freshness sweep — marks dead/closed listings as EXPIRED.
 
-Job postings get pulled, closed, or filled while sitting in the pipeline
-between discovery and the user clicking Apply. Burning Upwork Connects or
-freelancermap submissions on a dead listing wastes a real resource, so we
-periodically revisit each non-terminal listing's URL and check whether it
-still accepts applications.
-
-Per-source detection (HTTP-based, no Playwright needed):
-  - LinkedIn:     body contains "No longer accepting" / "job closed" markers
-  - Freelancermap: body contains "Projekt nicht mehr aktuell" or returns
-                   a "Projekt nicht gefunden" / 404 page
-  - Upwork:       not handled here — Upwork's logged-out page hides the
-                   not-found signal behind reCAPTCHA. Use the Playwright
-                   discover re-run instead.
-  - Bundesagentur: body contains "Stellenangebot nicht mehr verfügbar"
-
 The sweep is idempotent. Only listings in non-terminal states
 (`NEW`, `SCORED`, `DRAFTED`, `COPIED`) are checked — `SUBMITTED`, `WON`,
 `REJECTED`, `EXPIRED` are left alone.
@@ -43,12 +28,8 @@ _DEAD_MARKERS: dict[str, re.Pattern[str]] = {
         r"no longer accepting applications|job__flavor--closed|posting (?:is )?closed",
         re.I,
     ),
-    Source.FREELANCERMAP.value: re.compile(
-        r"Projekt nicht mehr aktuell|Projekt nicht gefunden|projekt wurde geschlossen|Projekt wurde abgelaufen",
-        re.I,
-    ),
-    Source.BUNDESAGENTUR.value: re.compile(
-        r"Stellenangebot nicht mehr verfügbar|Stellenangebot wurde geschlossen|Diese Seite konnte nicht gefunden werden",
+    Source.INDEED.value: re.compile(
+        r"this job is no longer (?:available|accepting applications)|job posting expired",
         re.I,
     ),
 }

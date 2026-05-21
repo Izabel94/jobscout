@@ -9,7 +9,7 @@ from jobscout.score import _PROMPT, _render, main
 
 def test_render_substitutes_all_placeholders() -> None:
     listing = Listing(
-        source=Source.UPWORK,
+        source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
         title="LangChain engineer",
@@ -32,7 +32,7 @@ def test_render_substitutes_all_placeholders() -> None:
 
 def test_render_handles_none_fields() -> None:
     listing = Listing(
-        source=Source.UPWORK,
+        source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
         title="t",
@@ -50,7 +50,7 @@ def test_main_scores_and_updates(mock_update, mock_list, mock_call) -> None:  # 
     mock_list.return_value = [
         {
             "id": "u1",
-            "source": "upwork",
+            "source": "linkedin",
             "source_id": "abc",
             "url": "https://x",
             "title": "LangChain engineer",

@@ -17,6 +17,7 @@ from pathlib import Path
 from jobscout.config_loader import load_profile
 from jobscout.llm import LLMJSONError, call_json
 
+_MODEL_DRAFT = "gemini-2.5-flash"  # spec decision
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
 _PROMPT_SCREENER = (_PROMPTS_DIR / "screener.v1.md").read_text(encoding="utf-8")
 
@@ -40,16 +41,15 @@ def answer_questions(
     profile = load_profile()
     numbered = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
     rendered = (
-        _PROMPT_SCREENER.replace("{{candidate_name}}", str(profile.get("name", "")))
+        _PROMPT_SCREENER.replace("{{candidate_name}}", str(profile.get("full_name") or ""))
         .replace("{{listing_title}}", listing_title)
         .replace("{{listing_description}}", (listing_description or "")[:4000])
         .replace("{{cover_letter}}", cover_letter)
         .replace("{{adapted_cv}}", adapted_cv)
         .replace("{{numbered_questions}}", numbered)
     )
-    model = profile["model_draft"]
     result = call_json(
-        model=model,
+        model=_MODEL_DRAFT,
         system="You answer Upwork screener questions concisely and specifically.",
         user=rendered,
         max_tokens=1500,

@@ -1,7 +1,7 @@
 """Sentence-transformer embeddings + cosine similarity for Hard Filter 4.
 
 The model (~80MB) is loaded lazily and cached for the process lifetime. The
-profile embedding (built from anchor case studies + required skill keywords)
+profile embedding (built from anchor summaries + required skill keywords)
 is also cached, so each listing only pays the per-text encode cost.
 """
 
@@ -25,8 +25,8 @@ def _model() -> SentenceTransformer:
 @lru_cache(maxsize=1)
 def _profile_embedding() -> NDArray[Any]:
     profile = load_profile()
-    parts = [f"{c['title']}: {c['summary']}" for c in profile["anchor_case_studies"]]
-    parts.append(", ".join(profile["required_skill_keywords"]))
+    parts = [f"{c['title']}: {c['summary']}" for c in profile.get("anchor_summaries") or []]
+    parts.append(", ".join(profile.get("required_skill_keywords") or []))
     return cast(NDArray[Any], _model().encode("\n\n".join(parts), normalize_embeddings=True))
 
 

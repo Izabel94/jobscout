@@ -7,7 +7,7 @@ from jobscout.models import Listing, RateUnit, Source
 
 def _l(**kw: Any) -> Listing:
     base: dict[str, Any] = dict(
-        source=Source.UPWORK,
+        source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
         title="LangChain engineer",

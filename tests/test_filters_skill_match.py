@@ -1,12 +1,25 @@
 from typing import Any
 
+import pytest
+
 from jobscout.filters import pass_skill_match, pass_title_denylist
 from jobscout.models import Listing, Source
 
 
+@pytest.fixture(autouse=True)
+def _profile(monkeypatch):
+    monkeypatch.setattr(
+        "jobscout.filters.load_profile",
+        lambda: {
+            "required_skill_keywords": ["LangChain", "LangGraph", "RAG", "Neo4j", "Python"],
+            "title_denylist": ["WordPress"],
+        },
+    )
+
+
 def _l(**kw: Any) -> Listing:
     base: dict[str, Any] = dict(
-        source=Source.UPWORK,
+        source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
         title="t",

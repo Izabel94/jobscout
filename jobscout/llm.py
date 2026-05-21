@@ -5,8 +5,9 @@ by writing a `_call_*` function with signature `(model, system, user, max_tokens
 and registering it in `_PROVIDERS`. The public `call_text` / `call_json` API is
 identical regardless of backend.
 
-Model names live in `config/profile.yaml` (`model_score`, `model_draft`). When
-switching provider, swap the model IDs there — no code change needed elsewhere.
+Model names are hardcoded as module-level constants (`_MODEL_SCORE`, `_MODEL_DRAFT`)
+in `score.py` and `draft.py`. When switching provider, swap those constants — no
+profile-row change needed.
 """
 
 from __future__ import annotations

@@ -3,7 +3,6 @@
 import logging
 from pathlib import Path
 
-from jobscout.config_loader import load_profile
 from jobscout.db import list_unscored_new_listings, update_listing_status
 from jobscout.llm import LLMJSONError, call_json
 from jobscout.models import Listing, ListingStatus
@@ -11,6 +10,7 @@ from jobscout.models import Listing, ListingStatus
 log = logging.getLogger("score")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+_MODEL_SCORE = "gemini-2.5-flash"  # spec decision
 _PROMPT = (Path(__file__).resolve().parent.parent / "config" / "prompts" / "score.v1.md").read_text()
 
 
@@ -29,16 +29,14 @@ def _render(template: str, listing: Listing) -> str:
 
 
 def main() -> None:
-    profile = load_profile()
-    model = profile["model_score"]
     rows = list_unscored_new_listings()
-    log.info("scoring %d listings with %s", len(rows), model)
+    log.info("scoring %d listings with %s", len(rows), _MODEL_SCORE)
     for row in rows:
         listing = Listing.model_validate(row)
         listing_id = str(row["id"])
         try:
             out = call_json(
-                model=model,
+                model=_MODEL_SCORE,
                 system="You output JSON only.",
                 user=_render(_PROMPT, listing),
                 max_tokens=400,

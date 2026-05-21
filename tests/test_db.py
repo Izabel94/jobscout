@@ -17,7 +17,7 @@ def test_upsert_listing_calls_supabase(mock_client):
     mock_table = MagicMock()
     mock_client.return_value.table.return_value = mock_table
     mock_table.upsert.return_value.execute.return_value.data = [{"id": "uuid"}]
-    listing = Listing(source=Source.UPWORK, source_id="abc", url="https://x", title="t", raw={})
+    listing = Listing(source=Source.LINKEDIN, source_id="abc", url="https://x", title="t", raw={})
     assert upsert_listing(listing) == "uuid"
     mock_client.return_value.table.assert_called_with("listings")
 

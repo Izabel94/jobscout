@@ -3,8 +3,10 @@
 import hashlib
 import re
 
-from jobscout.config_loader import load_spam_rules
+from jobscout.config_loader import load_profile, load_spam_rules
 from jobscout.models import Arrangement, JobType, Listing, RateUnit
+
+_EMBEDDING_THRESHOLD = 0.30  # spec decision
 
 HIGH_CONFIDENCE_ONSITE_EVIDENCE = (
     "5 days",
@@ -116,7 +118,5 @@ def pass_title_denylist(listing: Listing) -> bool:
 def pass_embedding(listing: Listing) -> bool:
     from jobscout.embeddings import cosine_to_profile
 
-    profile = load_profile()
-    threshold = float(profile["embedding_threshold"])
     text = f"{listing.title}\n{listing.description or ''}"[:2048]
-    return cosine_to_profile(text) >= threshold
+    return cosine_to_profile(text) >= _EMBEDDING_THRESHOLD

@@ -4,15 +4,45 @@ from unittest.mock import patch
 
 import pytest
 
-from jobscout.config_loader import load_cv_markdown
 from jobscout.draft import _extract_contact_name, _verify_cv_facts, draft_one
 from jobscout.models import Draft, Listing, ListingStatus, Source
+
+_CV_BASE_EN = (
+    "# Test User\n\n"
+    "## Work\n\n"
+    "### Acme Corp | Berlin\n"
+    "*2019 – 2021*\n\n"
+    "- Built things.\n"
+)
+_CV_BASE_DE = (
+    "# Test User\n\n"
+    "## Berufserfahrung\n\n"
+    "### Acme Corp | Berlin\n"
+    "*2019 – 2021*\n\n"
+    "- Dinge gebaut.\n"
+)
+
+
+@pytest.fixture(autouse=True)
+def _profile_and_cv(monkeypatch):
+    monkeypatch.setattr(
+        "jobscout.draft.load_profile",
+        lambda: {
+            "full_name": "Test User",
+            "required_skill_keywords": ["LangChain", "RAG"],
+            "anchor_summaries": [{"title": "T", "summary": "S"}],
+        },
+    )
+    monkeypatch.setattr(
+        "jobscout.draft.load_cv_markdown",
+        lambda language: _CV_BASE_DE if language.lower().startswith("de") else _CV_BASE_EN,
+    )
 
 
 def _listing(language: str = "en") -> Listing:
     return Listing(
         id="ulistid",
-        source=Source.UPWORK,
+        source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
         title="LangChain engineer",
@@ -26,7 +56,7 @@ def _listing(language: str = "en") -> Listing:
 @patch("jobscout.draft.write_draft")
 @patch("jobscout.draft.call_text")
 def test_draft_one_persists_and_updates_status(mock_call, mock_write, mock_update):
-    base = load_cv_markdown("en")
+    base = _CV_BASE_EN
     # The "adapted" CV is the unchanged base — that's a valid surgical edit
     # (zero changes) and must always preserve facts.
     mock_call.side_effect = ["proposal body text", base]
@@ -60,7 +90,7 @@ def test_draft_one_raises_when_employer_header_drops(mock_call, mock_write, mock
 @patch("jobscout.draft.write_draft")
 @patch("jobscout.draft.call_text")
 def test_draft_one_german_listing_uses_german_cv(mock_call, mock_write, mock_update):
-    base_de = load_cv_markdown("de")
+    base_de = _CV_BASE_DE
     mock_call.side_effect = ["Bewerbung text", base_de]
     mock_write.return_value = "draft-uuid"
 
@@ -109,14 +139,13 @@ def test_proposal_prompt_renders_without_unfilled_placeholders():
     from jobscout.draft import _PROMPT_PROP, _case_studies, _profile_blurb
 
     profile = {
-        "name": "Test",
-        "target_rate_floor_eur_hr": 60,
+        "full_name": "Test",
         "required_skill_keywords": ["LangChain", "RAG"],
-        "anchor_case_studies": [{"title": "T", "summary": "S"}],
+        "anchor_summaries": [{"title": "T", "summary": "S"}],
     }
     rendered = (
         _PROMPT_PROP.replace("{{profile_blurb}}", _profile_blurb(profile))
-        .replace("{{candidate_name}}", profile["name"])
+        .replace("{{candidate_name}}", profile["full_name"])
         .replace("{{anchor_case_studies}}", _case_studies(profile))
         .replace("{{title}}", "title")
         .replace("{{description}}", "desc")
