@@ -142,8 +142,8 @@ def render_empty_state() -> None:
     if fk != "all":
         # Filter excludes everything — show clear-filter affordance
         st.markdown(
-            '<div style="background:#fafafa;border:1px dashed #ddd;border-radius:12px;padding:24px;text-align:center;color:#666">'
-            '<div style="margin-bottom:8px">No matches for this filter.</div>'
+            '<div style="background:#fafafa;border:1px dashed #ddd;border-radius:12px;padding:24px;text-align:center;color:#666;margin-bottom:14px">'
+            '<div>No matches for this filter.</div>'
             "</div>",
             unsafe_allow_html=True,
         )
