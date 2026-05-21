@@ -21,7 +21,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from jobscout.derive import classify_arrangement, classify_job_type  # noqa: E402
+from jobscout.derive import (  # noqa: E402
+    classify_apply_method,
+    classify_arrangement,
+    classify_job_type,
+)
 
 DIRS = [
     (ROOT / "tests" / "fixtures" / "listings" / "linkedin", "linkedin"),
@@ -39,16 +43,6 @@ def _suggest_job_type(raw: dict[str, Any]) -> tuple[str, str]:
     return jt.value, ev
 
 
-def _apply_method_for(source: str, raw: dict[str, Any]) -> str:
-    if source == "linkedin":
-        return "easy_apply"
-    # Indeed's company_url_direct comes from JobSpy as either a string, None,
-    # or float NaN (pandas leakage). Treat any non-string as "no URL".
-    raw_url = raw.get("company_url_direct")
-    url = raw_url.strip() if isinstance(raw_url, str) else ""
-    return "external_apply" if url else "easy_apply"
-
-
 def main() -> int:
     n = 0
     for d, source in DIRS:
@@ -64,6 +58,7 @@ def main() -> int:
             raw = json.loads(fp.read_text())
             arr, arr_ev = _suggest_arrangement(raw)
             jt, jt_ev = _suggest_job_type(raw)
+            am, _am_ev = classify_apply_method(source, raw)
             labels_fp.write_text(
                 json.dumps(
                     {
@@ -71,7 +66,7 @@ def main() -> int:
                         "arrangement_evidence": arr_ev,
                         "expected_job_type": jt,
                         "job_type_evidence": jt_ev,
-                        "expected_apply_method": _apply_method_for(source, raw),
+                        "expected_apply_method": am.value,
                         "labeler": "regex-heuristic",
                         "verified_by_operator": False,
                     },

@@ -149,5 +149,13 @@ def classify_job_type(raw: dict[str, Any]) -> tuple[JobType, str]:
     return JobType.UNKNOWN, ""
 
 
-def classify_apply_method(raw: dict[str, Any]) -> tuple[ApplyMethod, str]:
-    raise NotImplementedError  # Task 7
+def classify_apply_method(source: str, raw: dict[str, Any]) -> tuple[ApplyMethod, str]:
+    """LinkedIn: hardcoded EASY_APPLY (company_url_direct empirically empty
+    in 100% of logged-out corpus). Indeed: EXTERNAL_APPLY iff
+    company_url_direct is present."""
+    if source == "linkedin":
+        return ApplyMethod.EASY_APPLY, "linkedin always easy_apply (company_url_direct empirically empty)"
+    url = _str(raw.get("company_url_direct")).strip()
+    if url:
+        return ApplyMethod.EXTERNAL_APPLY, url
+    return ApplyMethod.EASY_APPLY, ""
