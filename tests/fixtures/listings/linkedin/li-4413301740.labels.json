@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "remote",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states `is_remote: True` and mentions 'full-time remote roles' and 'Remote within the German time zone'.",
+  "job_type_reasoning": "The listing clearly specifies `job_type: fulltime` and reiterates 'full-time remote roles' in the description.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

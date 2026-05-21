@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing mentions 'hybrid setup with 3 core office days' and also '3 weeks of remote work per year', indicating a mix of both.",
+  "job_type_reasoning": "The job title clearly states 'fulltime'.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

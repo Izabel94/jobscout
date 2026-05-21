@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states a 'Hybrid work model – 2-3 on-site team days per week at our Hamburg office, with flexibility to work from home'.",
+  "job_type_reasoning": "The job_type field is 'fulltime' and no other conflicting job type (like permanent, contract, parttime, or intern) is mentioned in the description.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

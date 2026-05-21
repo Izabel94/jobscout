@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing specifies a Hamburg location but also mentions 'individuelle hybride Homeoffice Möglichkeiten nach Absprache', indicating a hybrid work model.",
+  "job_type_reasoning": "The listing clearly states 'job_type: fulltime' and mentions a '38-Stunden-Woche', confirming it as a full-time position.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

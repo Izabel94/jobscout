@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "remote",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states 'is_remote: True' and 'Location: Deutschland, remote' with no indication of required office presence.",
+  "job_type_reasoning": "The job_type field is 'fulltime' and the description also specifies 'Arbeitszeit: Vollzeit'.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

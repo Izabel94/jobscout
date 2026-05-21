@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "parttime",
+  "arrangement_reasoning": "The listing states the work location is in Hamburg and mentions commuting options, with no indication of remote work.",
+  "job_type_reasoning": "The job listing explicitly states 'job_type: parttime'.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "remote",
+  "expected_job_type": "parttime",
+  "arrangement_reasoning": "The listing explicitly states 'part-time remote opportunity' and 'Work fully remote on your own schedule'.",
+  "job_type_reasoning": "The listing clearly states 'This part-time remote opportunity' and 'parttime' is also mentioned in the provided job details.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

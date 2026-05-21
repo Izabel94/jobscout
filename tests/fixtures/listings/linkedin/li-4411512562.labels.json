@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The description mentions a 'Mobile Working Modell' with the possibility to work from home part of the time, alongside working in the office.",
+  "job_type_reasoning": "The job title is for a 'Senior Data Engineer' and the description does not suggest part-time or contract work, implying a standard full-time role.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

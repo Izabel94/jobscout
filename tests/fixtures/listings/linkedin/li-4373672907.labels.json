@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states 'Hybrid work and flex-time' in the benefits section.",
+  "job_type_reasoning": "The input `job_type` field is explicitly `fulltime` and the description does not contradict or specify otherwise.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

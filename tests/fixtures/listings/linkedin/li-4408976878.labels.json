@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing mentions 'mobiles Arbeiten (bis zu 49 % im Monat)' which indicates a hybrid work model.",
+  "job_type_reasoning": "The listing explicitly states 'Vollzeit' which translates to fulltime.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

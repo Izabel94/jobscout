@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing specifies a location in Hamburg and does not mention any remote work options, implying an onsite arrangement.",
+  "job_type_reasoning": "The job title and description explicitly state 'fulltime' and do not indicate any part-time or contract roles.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

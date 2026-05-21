@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "permanent",
+  "arrangement_reasoning": "The listing explicitly states 'is_remote: False', mentions expanding capabilities at the 'Hamburg site', and refers to the role as being 'on site', indicating a full on-site presence.",
+  "job_type_reasoning": "The 'job_type' field is 'fulltime', and the benefits section explicitly states 'Permanent employment', which takes precedence over 'fulltime' based on the rules.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

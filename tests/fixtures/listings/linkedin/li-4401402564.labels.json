@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing states 'is_remote: False', mentions specific office locations, and describes on-site team activities without any mention of remote or hybrid work.",
+  "job_type_reasoning": "The listing explicitly states 'job_type: fulltime' and does not provide any other conflicting or superseding job type information.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

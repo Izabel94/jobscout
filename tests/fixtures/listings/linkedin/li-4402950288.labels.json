@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "hybrid",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states 'Mobiles Arbeiten bis zu 49% möglich', indicating a blend of remote and on-site work.",
+  "job_type_reasoning": "The listing title includes '(m/w/d)' and the description mentions 'In Vollzeit', which aligns with a fulltime position.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash"
+}

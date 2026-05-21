@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly mentions two office locations (Hamburg or Frankfurt) and describes a \"hybrid work model\" without specifying any remote days, implying a need for on-site presence.",
+  "job_type_reasoning": "The listing states 'job_type: fulltime' and describes responsibilities typical of a full-time role.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}

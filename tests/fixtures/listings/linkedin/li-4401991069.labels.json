@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "onsite",
+  "expected_job_type": "fulltime",
+  "arrangement_reasoning": "The listing explicitly states 'False' for is_remote and mentions 'bundesweiten Standorten' (nationwide locations), implying the need for on-site presence.",
+  "job_type_reasoning": "The listing explicitly states 'fulltime' for the job type.",
+  "expected_apply_method": "easy_apply",
+  "verified_by_operator": false,
+  "labeler": "gemini-2.5-flash-lite"
+}
