@@ -29,6 +29,10 @@ def render_search_terms_card() -> None:
             cols = st.columns(len(terms))
             for i, term in enumerate(terms):
                 with cols[i]:
+                    st.markdown(
+                        '<span class="jobscout-chip-marker-search"></span>',
+                        unsafe_allow_html=True,
+                    )
                     if st.button(f"× {term}", key=f"rm-term-{i}"):
                         terms.pop(i)
                         p["required_skill_keywords"] = terms
@@ -87,6 +91,10 @@ def render_title_denylist_card() -> None:
             cols = st.columns(len(denies))
             for i, d in enumerate(denies):
                 with cols[i]:
+                    st.markdown(
+                        '<span class="jobscout-chip-marker-deny"></span>',
+                        unsafe_allow_html=True,
+                    )
                     if st.button(f"× {d}", key=f"rm-deny-{i}"):
                         denies.pop(i)
                         p["title_denylist"] = denies

@@ -104,6 +104,43 @@ _CSS = """
     .jobscout-empty-callout { padding:24px 16px; }
     .jobscout-profile-snapshot { padding:14px; }
   }
+
+  /* Settings chip coloring — marker span (display:none) is dropped in the
+     same column as the chip button; CSS :has() finds the marker's nearest
+     stColumn ancestor and styles the button inside. */
+  .jobscout-chip-marker-search,
+  .jobscout-chip-marker-deny { display: none; }
+
+  /* Tight pill shape applied to ANY chip button (search or deny) */
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button,
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button {
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    padding: 4px 10px;
+    min-height: 0;
+  }
+
+  /* Search-term chips — blue */
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button {
+    background: #eff6ff !important;
+    color: #1e40af !important;
+    border: 1px solid #dbeafe !important;
+  }
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button:hover {
+    background: #dbeafe !important;
+  }
+
+  /* Title-denylist chips — red */
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+    border: 1px solid #fecaca !important;
+  }
+  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button:hover {
+    background: #fecaca !important;
+  }
 </style>
 """
 
