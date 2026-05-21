@@ -46,6 +46,10 @@ def _fixture_listing(**overrides):
 def main():
     st.set_page_config(page_title="card test", layout="wide")
     inject_styles()
+    # KPI hero (real Supabase counts) — for Playwright smoke
+    from jobscout.ui.pipeline import render_kpi_hero
+    render_kpi_hero()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     st.title("card.render() Playwright smoke")
     render_card(_fixture_listing())
     render_card(_fixture_listing(

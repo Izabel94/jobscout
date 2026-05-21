@@ -113,6 +113,54 @@ def list_pipeline_listings(statuses: list[ListingStatus], limit: int = 100) -> l
     return cast(list[dict[str, Any]], res.data)
 
 
+def count_listings_new_today() -> int:
+    from datetime import datetime, timezone
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    r = (
+        _client().table("listings")
+        .select("id", count="exact")
+        .gte("first_discovered_at", today_start)
+        .neq("status", "rejected")
+        .execute()
+    )
+    return r.count or 0
+
+
+def count_listings_in_dashboard() -> int:
+    r = (
+        _client().table("listings")
+        .select("id", count="exact")
+        .in_("status", ("scored", "drafted"))
+        .execute()
+    )
+    return r.count or 0
+
+
+def count_submissions_last_7d() -> int:
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    r = (
+        _client().table("submissions")
+        .select("id", count="exact")
+        .gte("submitted_at", cutoff)
+        .execute()
+    )
+    return r.count or 0
+
+
+def count_submissions_today_external() -> int:
+    from datetime import datetime, timezone
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    r = (
+        _client().table("submissions")
+        .select("id", count="exact")
+        .gte("submitted_at", today_start)
+        .eq("channel", "external_apply")
+        .execute()
+    )
+    return r.count or 0
+
+
 def list_source_runs(limit: int = 40) -> list[dict[str, Any]]:
     """Most recent source_runs, descending by start time."""
     res = _client().table("source_runs").select("*").order("started_at", desc=True).limit(limit).execute()
