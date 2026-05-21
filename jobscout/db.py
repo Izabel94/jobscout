@@ -108,26 +108,25 @@ def list_pipeline_listings(statuses: list[ListingStatus], limit: int = 100) -> l
     return cast(list[dict[str, Any]], res.data)
 
 
-def list_onboarding_targets() -> list[dict[str, Any]]:
-    """All onboarding targets, ordered by status (groups not_started/in_progress/etc together)."""
-    res = _client().table("onboarding_targets").select("*").order("status").execute()
-    return cast(list[dict[str, Any]], res.data)
-
-
-def update_onboarding_status(target_id: str, status: str) -> None:
-    """Set status on an onboarding target row."""
-    _client().table("onboarding_targets").update({"status": status}).eq("id", target_id).execute()
-
-
 def list_source_runs(limit: int = 40) -> list[dict[str, Any]]:
     """Most recent source_runs, descending by start time."""
     res = _client().table("source_runs").select("*").order("started_at", desc=True).limit(limit).execute()
     return cast(list[dict[str, Any]], res.data)
 
 
-def upsert_onboarding_target(card: dict[str, Any]) -> None:
-    """Upsert a single onboarding target row by name."""
-    _client().table("onboarding_targets").upsert(card, on_conflict="name").execute()
+def get_profile(linkedin_url: str) -> dict[str, Any] | None:
+    """Returns the single profile row matching linkedin_url, or None."""
+    r = _client().table("profiles").select("*").eq("linkedin_url", linkedin_url).execute()
+    rows = r.data or []
+    return rows[0] if rows else None
+
+
+def upsert_profile(profile: dict[str, Any]) -> None:
+    """Insert or update by linkedin_url. Server-side timestamps."""
+    payload = dict(profile)
+    payload.pop("id", None)
+    payload.pop("updated_at", None)
+    _client().table("profiles").upsert(payload, on_conflict="linkedin_url").execute()
 
 
 def get_listing_by_id(listing_id: str) -> dict[str, Any] | None:

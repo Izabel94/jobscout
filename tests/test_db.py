@@ -4,13 +4,10 @@ from jobscout.db import (
     claim_one_pending_apply_request,
     get_latest_draft_for_listing,
     list_by_status,
-    list_onboarding_targets,
     list_pipeline_listings,
     list_source_runs,
     list_unscored_new_listings,
-    update_onboarding_status,
     upsert_listing,
-    upsert_onboarding_target,
 )
 from jobscout.models import Listing, ListingStatus, Source
 
@@ -66,27 +63,6 @@ def test_list_pipeline_listings_empty_statuses_returns_empty(mock_client):
 
 
 @patch("jobscout.db._client")
-def test_list_onboarding_targets_orders_by_status(mock_client):
-    chain = mock_client.return_value.table.return_value
-    chain.select.return_value.order.return_value.execute.return_value.data = [
-        {"id": "o1", "status": "not_started", "name": "Malt"},
-    ]
-    assert list_onboarding_targets() == [{"id": "o1", "status": "not_started", "name": "Malt"}]
-    mock_client.return_value.table.assert_called_with("onboarding_targets")
-    chain.select.return_value.order.assert_called_with("status")
-
-
-@patch("jobscout.db._client")
-def test_update_onboarding_status_updates_by_id(mock_client):
-    chain = mock_client.return_value.table.return_value
-    update_onboarding_status("abc-123", "in_progress")
-    mock_client.return_value.table.assert_called_with("onboarding_targets")
-    chain.update.assert_called_with({"status": "in_progress"})
-    chain.update.return_value.eq.assert_called_with("id", "abc-123")
-    chain.update.return_value.eq.return_value.execute.assert_called_once()
-
-
-@patch("jobscout.db._client")
 def test_list_source_runs_orders_desc_and_limits(mock_client):
     chain = mock_client.return_value.table.return_value
     chain.select.return_value.order.return_value.limit.return_value.execute.return_value.data = [
@@ -96,16 +72,6 @@ def test_list_source_runs_orders_desc_and_limits(mock_client):
     mock_client.return_value.table.assert_called_with("source_runs")
     chain.select.return_value.order.assert_called_with("started_at", desc=True)
     chain.select.return_value.order.return_value.limit.assert_called_with(10)
-
-
-@patch("jobscout.db._client")
-def test_upsert_onboarding_target_uses_name_conflict(mock_client):
-    chain = mock_client.return_value.table.return_value
-    card = {"name": "Malt", "category": "freelance_marketplace", "status": "not_started"}
-    upsert_onboarding_target(card)
-    mock_client.return_value.table.assert_called_with("onboarding_targets")
-    chain.upsert.assert_called_with(card, on_conflict="name")
-    chain.upsert.return_value.execute.assert_called_once()
 
 
 @patch("jobscout.db._client")
