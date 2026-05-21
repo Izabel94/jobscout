@@ -1,7 +1,6 @@
 """jobscout dashboard — entry point.
 
-Two tabs: Pipeline (default) + Settings. Password-gated when JOBSCOUT_DEPLOYED.
-No /admin route in v1.
+Tabs: Pipeline (default), Settings. Password gate when JOBSCOUT_DEPLOYED=1.
 """
 
 from __future__ import annotations
@@ -27,6 +26,13 @@ def main() -> None:
     st.set_page_config(page_title="jobscout", layout="wide")
     inject_styles()
     auth_gate()
+
+    st.markdown(
+        '<div style="display:flex;justify-content:space-between;align-items:center;'
+        'padding-bottom:12px;border-bottom:1px solid #eee;margin-bottom:16px">'
+        '<div style="font-weight:700;font-size:20px">jobscout</div></div>',
+        unsafe_allow_html=True,
+    )
 
     pipeline_tab, settings_tab = st.tabs(["Pipeline", "Settings"])
     with pipeline_tab:
