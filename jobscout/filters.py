@@ -2,80 +2,34 @@
 
 import hashlib
 import re
-from decimal import Decimal
 
-from jobscout.config_loader import load_profile, load_spam_rules
-from jobscout.models import Listing, RateUnit, Source
+from jobscout.config_loader import load_spam_rules
+from jobscout.models import Arrangement, JobType, Listing, RateUnit
 
-# Cross-source full-time markers (EN + DE). "unbefristet" = indefinite-term,
-# the German FTE marker employers use to avoid the word "Festanstellung".
-_FULLTIME_LITERAL_RE = re.compile(
-    r"full[- ]?time|fulltime|vollzeit|festanstellung|unbefristet|permanent (?:position|role|employment)",
-    re.I,
+HIGH_CONFIDENCE_ONSITE_EVIDENCE = (
+    "5 days",
+    "5 tage",
+    "100% on-site",
+    "100% vor ort",
+    "fully on-site",
+    "vollständig vor ort",
+    "no remote",
+    "nicht remote",
 )
-
-# Workload statement with explicit /week qualifier. "24 hours" alone (e.g. an SLA) does NOT match.
-_HOURS_PER_WEEK_RE = re.compile(
-    r"\b(\d{1,3})(?:\s*(?:-|–|to|bis)\s*(\d{1,3}))?"  # noqa: RUF001 — EN DASH appears in real listings
-    r"\s*(?:h|hours?|hrs?|std)\b"
-    r"[\s/-]*(?:per|pro)?\s*(?:week|wk|woche)\b",
-    re.I,
-)
-
-# LinkedIn descriptions rarely say "full-time" literally — gate on JobSpy's `job_type` field instead.
-_ACCEPTED_LINKEDIN_JOB_TYPES = frozenset({"contract", "parttime", "temporary"})
-
-# Freelancermap "X% Auslastung" = utilization. "100%" ≈ full-time, "50%" ≈ 20h/week.
-# Two formats: "100% Auslastung" (badge) and "Auslastung: 80-100 %" (labeled field).
-_AUSLASTUNG_RE = re.compile(
-    r"(?:(\d{1,3})\s*%\s*Auslastung|Auslastung[:\s]+(\d{1,3})\s*(?:[-–]\s*\d{1,3}\s*)?%)",  # noqa: RUF001
-    re.I,
-)
-_AUSLASTUNG_REFERENCE_HOURS = 40
 
 
 def pass_structural(listing: Listing) -> bool:
-    profile = load_profile()
-    if listing.remote is False:
-        return False
-    # LinkedIn-specific: drop RLHF/data-labeling gig marketplaces (Alignerr, Outlier, etc.)
-    # that post under engineering titles but route to a generic data-trainer onboarding form.
-    if listing.source == Source.LINKEDIN:
-        from jobscout.sources.linkedin import is_company_denylisted
+    """Drop part-time/contract/intern. Drop high-confidence on-site. Keep everything else."""
 
-        company = (listing.raw or {}).get("company")
-        if is_company_denylisted(company):
+    if listing.job_type_classified in (JobType.CONTRACT, JobType.PARTTIME, JobType.INTERN):
+        return False
+
+    if listing.arrangement == Arrangement.ONSITE:
+        ev = (listing.arrangement_evidence or "").lower()
+        if any(marker in ev for marker in HIGH_CONFIDENCE_ONSITE_EVIDENCE):
             return False
-    if listing.rate_max is not None and listing.rate_unit in (RateUnit.HOUR, None):
-        if listing.currency == "USD":
-            if listing.rate_max < Decimal(profile["target_rate_floor_usd_hr"]):
-                return False
-        else:
-            if listing.rate_max < Decimal(profile["target_rate_floor_eur_hr"]):
-                return False
-    max_hours = Decimal(profile["max_hours_per_week"])
-    if listing.hours_per_week is not None and listing.hours_per_week > max_hours:
-        return False
-    text = f"{listing.title}\n{listing.description or ''}"
-    if _FULLTIME_LITERAL_RE.search(text):
-        return False
-    # The binding constraint across multiple "X hrs/week" mentions is the MINIMUM commitment.
-    low_ends = [Decimal(m.group(1)) for m in _HOURS_PER_WEEK_RE.finditer(text)]
-    if low_ends and min(low_ends) > max_hours:
-        return False
-    auslastung_pcts = []
-    for m in _AUSLASTUNG_RE.finditer(text):
-        pct_str = m.group(1) or m.group(2)
-        if pct_str:
-            auslastung_pcts.append(int(pct_str))
-    if auslastung_pcts:
-        implied_hours = Decimal(min(auslastung_pcts) * _AUSLASTUNG_REFERENCE_HOURS) / Decimal(100)
-        if implied_hours > max_hours:
-            return False
-    job_type = listing.raw.get("job_type") if isinstance(listing.raw, dict) else None
-    if isinstance(job_type, str) and job_type.lower() not in _ACCEPTED_LINKEDIN_JOB_TYPES:
-        return False
-    return not (listing.language and listing.language not in profile["languages_accepted"])
+
+    return True
 
 
 def has_hard_drop_pattern(listing: Listing) -> bool:
