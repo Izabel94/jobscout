@@ -36,6 +36,10 @@ _CSS = """
     border-left: 4px solid #16a34a !important;
   }
 
+  /* Card title row — favicon + title flex layout */
+  .jobscout-card-row { display:flex; align-items:center; gap:8px; }
+  .jobscout-card-title { font-weight:600; font-size:15px; }
+
   /* Muted metadata row */
   .jobscout-meta { color:#6b7280; font-size:13px; }
 
@@ -43,6 +47,63 @@ _CSS = """
   .jobscout-rationale { background:#f0fdf4; border-left:3px solid #16a34a;
     padding:8px 12px; font-size:13px; color:#374151; border-radius:0 6px 6px 0;
     margin:8px 0; }
+
+  /* KPI hero tiles */
+  .jobscout-kpi-tile {
+    background:white; border:1px solid #eee; border-radius:10px; padding:14px;
+  }
+  .jobscout-kpi-label {
+    color:#666; font-size:11px; letter-spacing:0.05em; text-transform:uppercase;
+  }
+  .jobscout-kpi-value {
+    font-size:28px; font-weight:700; margin-top:4px;
+  }
+  .jobscout-kpi-suffix { color:#999; font-size:18px; }
+
+  /* Pagination status caption */
+  .jobscout-pagination-status {
+    text-align:center; color:#666; font-size:13px; padding-top:8px;
+  }
+
+  /* Empty / no-match callout */
+  .jobscout-empty-callout {
+    background:#fafafa; border:1px dashed #ddd; border-radius:12px;
+    padding:32px; text-align:center; color:#666;
+  }
+  .jobscout-empty-callout.compact { padding:24px; }
+  .jobscout-empty-title {
+    font-size:16px; font-weight:600; color:#1f2937; margin-bottom:8px;
+  }
+  .jobscout-empty-body { font-size:14px; }
+
+  /* safe_render error banner */
+  .jobscout-error-callout {
+    background:#fef2f2; border:1px solid #fecaca; border-radius:12px;
+    padding:16px; color:#7f1d1d;
+  }
+  .jobscout-error-title { font-weight:600; }
+
+  /* Read-only profile snapshot in Settings */
+  .jobscout-profile-snapshot {
+    background:#fafafa; border:1px solid #eee; border-radius:10px;
+    padding:18px; font-size:13px; color:#666;
+  }
+  .jobscout-profile-snapshot-title {
+    font-weight:600; color:#1f2937; margin-bottom:8px;
+  }
+  .jobscout-profile-snapshot-footer {
+    margin-top:8px; color:#999; font-size:12px;
+  }
+
+  /* Mobile reflow — at narrow widths, soften the KPI hero so 4 tiles wrap
+     gracefully (Streamlit stacks st.columns on mobile, but the tile padding
+     can feel cramped). */
+  @media (max-width: 768px) {
+    .jobscout-kpi-tile { padding:12px; }
+    .jobscout-kpi-value { font-size:24px; }
+    .jobscout-empty-callout { padding:24px 16px; }
+    .jobscout-profile-snapshot { padding:14px; }
+  }
 </style>
 """
 

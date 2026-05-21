@@ -143,13 +143,13 @@ def render_profile_snapshot() -> None:
     skills = ", ".join((p.get("skills") or [])[:5])
     last = p.get("linkedin_scraped_at") or "—"
     st.markdown(
-        '<div style="background:#fafafa;border:1px solid #eee;border-radius:10px;padding:18px;font-size:13px;color:#666;margin-top:8px">'
-        f'<div style="font-weight:600;color:#1f2937;margin-bottom:8px">Your profile (read-only — re-run bootstrap to refresh)</div>'
+        '<div class="jobscout-profile-snapshot">'
+        '<div class="jobscout-profile-snapshot-title">Your profile (read-only — re-run bootstrap to refresh)</div>'
         f'<div><strong>Name:</strong> {p.get("full_name", "—") or "—"}</div>'
         f'<div><strong>Headline:</strong> {p.get("headline", "—") or "—"}</div>'
         f'<div><strong>Location:</strong> {p.get("location", "—") or "—"}</div>'
         f'<div><strong>Skills:</strong> {skills or "—"}</div>'
-        f'<div style="margin-top:8px;color:#999;font-size:12px">Last scraped: {last}</div>'
+        f'<div class="jobscout-profile-snapshot-footer">Last scraped: {last}</div>'
         "</div>",
         unsafe_allow_html=True,
     )

@@ -22,9 +22,9 @@ APPLY_DAILY_CAP = 10
 
 def _kpi_tile(label: str, value_html: str) -> None:
     st.markdown(
-        f'<div style="background:white;border:1px solid #eee;border-radius:10px;padding:14px">'
-        f'<div style="color:#666;font-size:11px;letter-spacing:0.05em;text-transform:uppercase">{label}</div>'
-        f'<div style="font-size:28px;font-weight:700;margin-top:4px">{value_html}</div>'
+        f'<div class="jobscout-kpi-tile">'
+        f'<div class="jobscout-kpi-label">{label}</div>'
+        f'<div class="jobscout-kpi-value">{value_html}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -42,7 +42,7 @@ def render_kpi_hero() -> None:
         _kpi_tile("New today", str(new_today))
     with col2:
         _kpi_tile("Auto-apply remaining",
-                  f'<span>{remaining}</span><span style="color:#999;font-size:18px"> / {APPLY_DAILY_CAP}</span>')
+                  f'<span>{remaining}</span><span class="jobscout-kpi-suffix"> / {APPLY_DAILY_CAP}</span>')
     with col3:
         _kpi_tile("In dashboard", str(in_dashboard))
     with col4:
@@ -115,7 +115,6 @@ def render_listing_list() -> None:
 
     for listing in listings:
         render_card(listing)
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     start = offset + 1
     end = min(offset + _PAGE_SIZE, total)
@@ -127,7 +126,7 @@ def render_listing_list() -> None:
                 st.rerun()
     with nav_cols[1]:
         st.markdown(
-            f'<div style="text-align:center;color:#666;font-size:13px;padding-top:8px">Showing {start}–{end} of {total}</div>',
+            f'<div class="jobscout-pagination-status">Showing {start}–{end} of {total}</div>',
             unsafe_allow_html=True,
         )
     with nav_cols[2]:
@@ -142,7 +141,7 @@ def render_empty_state() -> None:
     if fk != "all":
         # Filter excludes everything — show clear-filter affordance
         st.markdown(
-            '<div style="background:#fafafa;border:1px dashed #ddd;border-radius:12px;padding:24px;text-align:center;color:#666;margin-bottom:14px">'
+            '<div class="jobscout-empty-callout compact">'
             '<div>No matches for this filter.</div>'
             "</div>",
             unsafe_allow_html=True,
@@ -157,9 +156,9 @@ def render_empty_state() -> None:
     last_run = _last_source_run()
     if last_run is None:
         st.markdown(
-            '<div style="background:#fafafa;border:1px dashed #ddd;border-radius:12px;padding:32px;text-align:center;color:#666">'
-            '<div style="font-size:16px;font-weight:600;color:#1f2937;margin-bottom:8px">Nothing here yet</div>'
-            '<div style="font-size:14px">The pipeline runs daily at 10:30 Berlin time. Check back tomorrow.</div>'
+            '<div class="jobscout-empty-callout">'
+            '<div class="jobscout-empty-title">Nothing here yet</div>'
+            '<div class="jobscout-empty-body">The pipeline runs daily at 10:30 Berlin time. Check back tomorrow.</div>'
             "</div>",
             unsafe_allow_html=True,
         )
@@ -169,9 +168,9 @@ def render_empty_state() -> None:
     ago = short_relative_time(last_run.get("started_at"))
     count = last_run.get("listings_new") or 0
     st.markdown(
-        '<div style="background:#fafafa;border:1px dashed #ddd;border-radius:12px;padding:32px;text-align:center;color:#666">'
-        '<div style="font-size:16px;font-weight:600;color:#1f2937;margin-bottom:8px">Nothing here yet</div>'
-        f'<div style="font-size:14px">Last pipeline run {ago}, surfaced {count} listings. The next run is daily at 10:30 Berlin time.</div>'
+        '<div class="jobscout-empty-callout">'
+        '<div class="jobscout-empty-title">Nothing here yet</div>'
+        f'<div class="jobscout-empty-body">Last pipeline run {ago}, surfaced {count} listings. The next run is daily at 10:30 Berlin time.</div>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -207,8 +206,8 @@ def safe_render(fn):
         except Exception as e:
             import traceback
             st.markdown(
-                '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;color:#7f1d1d">'
-                '<div style="font-weight:600">Something broke. The operator has been notified.</div>'
+                '<div class="jobscout-error-callout">'
+                '<div class="jobscout-error-title">Something broke. The operator has been notified.</div>'
                 "</div>",
                 unsafe_allow_html=True,
             )

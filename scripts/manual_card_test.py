@@ -21,10 +21,8 @@ def main():
     inject_styles()
     from jobscout.ui.pipeline import render_filter_bar, render_kpi_hero, render_listing_list
     render_kpi_hero()
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     st.title("pipeline filter + list smoke")
     render_filter_bar()
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     render_listing_list()
 
 
