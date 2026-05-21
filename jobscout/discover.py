@@ -2,8 +2,10 @@
 
 import argparse
 import logging
+import re
 import traceback
 
+from jobscout.config_loader import load_profile
 from jobscout.db import log_source_run, upsert_listing
 from jobscout.sources.indeed import IndeedSource
 from jobscout.sources.linkedin import LinkedInSource
@@ -11,15 +13,19 @@ from jobscout.sources.linkedin import LinkedInSource
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("discover")
 
-# TODO(Task 16): replace hardcoded defaults with DB-driven config from profiles row.
-_DEFAULT_SEARCH_TERMS = [
-    "AI engineer freelance",
-    "LLM engineer contract",
-    "LangChain contract",
-    "LangGraph contract",
-    "RAG engineer contract",
+_LOCATION = "Hamburg"
+_MAX_TERMS = 5
+_ROLE_TOKEN_RE = re.compile(
+    r"\b(engineer|scientist|developer|architect|manager|designer|analyst|consultant)\b",
+    re.I,
+)
+_FALLBACK_SEARCH_TERMS = [
+    "Software Engineer",
+    "Data Scientist",
+    "Machine Learning Engineer",
+    "Python Developer",
+    "Backend Engineer",
 ]
-_DEFAULT_LOCATION = "Hamburg"
 
 _SOURCES = {
     "linkedin": LinkedInSource,
@@ -27,15 +33,41 @@ _SOURCES = {
 }
 
 
+def _derive_search_terms() -> list[str]:
+    try:
+        profile = load_profile()
+    except RuntimeError:
+        return _FALLBACK_SEARCH_TERMS
+
+    keywords = list(profile.get("required_skill_keywords") or [])
+    headline = profile.get("headline") or ""
+    role_match = _ROLE_TOKEN_RE.search(headline)
+    role = role_match.group(0) if role_match else "Engineer"
+
+    if len(keywords) >= 3:
+        terms = keywords[:_MAX_TERMS]
+    else:
+        skills = list(profile.get("skills") or [])
+        seeds = (keywords + skills)[:_MAX_TERMS]
+        terms = [f"{s} {role}".strip() for s in seeds]
+
+    if not terms:
+        return _FALLBACK_SEARCH_TERMS
+    return terms[:_MAX_TERMS]
+
+
 def _sources_to_run(only: list[str] | None) -> list[object]:
     def included(n: str) -> bool:
         return only is None or n in only
 
+    search_terms = _derive_search_terms()
+    log.info("discover search terms: %s", search_terms)
+
     sources: list[object] = []
     if included("linkedin"):
-        sources.append(LinkedInSource(search_terms=_DEFAULT_SEARCH_TERMS))
+        sources.append(LinkedInSource(search_terms=search_terms, location=_LOCATION))
     if included("indeed"):
-        sources.append(IndeedSource(search_terms=_DEFAULT_SEARCH_TERMS, location=_DEFAULT_LOCATION))
+        sources.append(IndeedSource(search_terms=search_terms, location=_LOCATION))
     return sources
 
 
