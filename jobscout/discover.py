@@ -2,13 +2,29 @@
 
 import argparse
 import logging
-import os
 import traceback
 
 from jobscout.db import log_source_run, upsert_listing
+from jobscout.sources.indeed import IndeedSource
+from jobscout.sources.linkedin import LinkedInSource
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("discover")
+
+# TODO(Task 16): replace hardcoded defaults with DB-driven config from profiles row.
+_DEFAULT_SEARCH_TERMS = [
+    "AI engineer freelance",
+    "LLM engineer contract",
+    "LangChain contract",
+    "LangGraph contract",
+    "RAG engineer contract",
+]
+_DEFAULT_LOCATION = "Hamburg"
+
+_SOURCES = {
+    "linkedin": LinkedInSource,
+    "indeed": IndeedSource,
+}
 
 
 def _sources_to_run(only: list[str] | None) -> list[object]:
@@ -16,49 +32,16 @@ def _sources_to_run(only: list[str] | None) -> list[object]:
         return only is None or n in only
 
     sources: list[object] = []
-    # Legacy `UPWORK_SAVED_SEARCH_URLS` kept as fallback; the current var wins if both are set.
-    upwork_raw = os.environ.get("UPWORK_SEARCH_URLS") or os.environ.get("UPWORK_SAVED_SEARCH_URLS") or ""
-    upwork_urls = [u.strip() for u in upwork_raw.split(",") if u.strip()]
-    upwork_headless = os.environ.get("UPWORK_HEADLESS", "1") not in ("0", "false", "False")
-    upwork_cdp_url = os.environ.get("UPWORK_CDP_URL") or None
-    if included("upwork") and upwork_urls:
-        # Lazy import: UpworkSource pulls playwright_stealth, which crawl4ai's
-        # tf-playwright-stealth shadows in cron. Keep it off the import graph
-        # when Upwork isn't requested.
-        from jobscout.sources.upwork import UpworkSource
-
-        sources.append(UpworkSource(search_urls=upwork_urls, headless=upwork_headless, cdp_url=upwork_cdp_url))
-    if included("bundesagentur"):
-        from jobscout.sources.bundesagentur import BundesagenturSource
-
-        sources.append(BundesagenturSource(search_terms=["KI Ingenieur", "LLM", "LangChain", "RAG"]))
-    if included("freelancermap"):
-        from jobscout.sources.freelancermap import FreelancermapSource
-
-        sources.append(FreelancermapSource(queries=["LangChain", "RAG", "LLM"]))
     if included("linkedin"):
-        from jobscout.sources.linkedin import LinkedInSource
-
-        sources.append(
-            LinkedInSource(
-                search_terms=[
-                    "AI engineer freelance",
-                    "LLM engineer contract",
-                    "LangChain contract",
-                    "LangGraph contract",
-                    "RAG engineer contract",
-                    "vector database freelance",
-                    "semantic search freelance",
-                    "LangSmith",
-                ]
-            )
-        )
+        sources.append(LinkedInSource(search_terms=_DEFAULT_SEARCH_TERMS))
+    if included("indeed"):
+        sources.append(IndeedSource(search_terms=_DEFAULT_SEARCH_TERMS, location=_DEFAULT_LOCATION))
     return sources
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", nargs="*")
+    ap.add_argument("--only", nargs="*", choices=["linkedin", "indeed"])
     ap.add_argument("--limit", type=int)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
