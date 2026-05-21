@@ -43,6 +43,11 @@ def update_listing_status(
     _client().table("listings").update(patch).eq("id", listing_id).execute()
 
 
+def mark_listing_viewed(listing_id: str) -> None:
+    """Idempotent first-view marker. Only sets viewed_at if NULL."""
+    _client().table("listings").update({"viewed_at": "now()"}).eq("id", listing_id).is_("viewed_at", "null").execute()
+
+
 def list_by_status(status: ListingStatus) -> list[dict[str, Any]]:
     res = (
         _client()
