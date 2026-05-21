@@ -1,10 +1,25 @@
+from __future__ import annotations
+
+import json
 from decimal import Decimal
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from jobscout.models import RateUnit, Source
+from jobscout.models import ApplyMethod, Arrangement, JobType, RateUnit, Source
 from jobscout.sources.linkedin import LinkedInSource, _parse_rate_from_description
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "listings" / "linkedin"
+
+
+def _load_fixtures_as_df() -> pd.DataFrame:
+    rows = []
+    for fp in sorted(FIXTURE_DIR.glob("*.json")):
+        if fp.name.endswith(".labels.json"):
+            continue
+        rows.append(json.loads(fp.read_text()))
+    return pd.DataFrame(rows)
 
 
 def test_listing_normalization(monkeypatch):
@@ -50,3 +65,36 @@ def test_listing_normalization(monkeypatch):
 )
 def test_parse_rate_from_description(text, expected):
     assert _parse_rate_from_description(text) == expected
+
+
+def test_linkedin_source_populates_derived_fields(monkeypatch):
+    from jobscout.sources import linkedin as li_mod
+
+    df = _load_fixtures_as_df()
+    monkeypatch.setattr(li_mod, "_scrape", lambda **_: df)
+
+    src = li_mod.LinkedInSource(search_terms=["test"], location="Hamburg")
+    listings = src.discover()
+
+    assert len(listings) > 0
+    for l in listings:
+        assert l.source == Source.LINKEDIN
+        assert l.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY), l.url
+        assert l.arrangement in tuple(Arrangement), l.url
+        assert l.job_type_classified in tuple(JobType), l.url
+    # All LinkedIn listings are easy_apply (per the empirical finding)
+    assert all(l.apply_method == ApplyMethod.EASY_APPLY for l in listings)
+
+
+def test_linkedin_source_attaches_evidence_strings(monkeypatch):
+    from jobscout.sources import linkedin as li_mod
+
+    df = _load_fixtures_as_df()
+    monkeypatch.setattr(li_mod, "_scrape", lambda **_: df)
+
+    src = li_mod.LinkedInSource(search_terms=["test"], location="Hamburg")
+    listings = src.discover()
+
+    # At least some have arrangement_evidence (hybrid/remote classifications)
+    with_evidence = [l for l in listings if l.arrangement_evidence]
+    assert len(with_evidence) > 0

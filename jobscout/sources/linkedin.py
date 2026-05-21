@@ -5,7 +5,7 @@ from typing import Any
 import pandas as pd
 from jobspy import scrape_jobs
 
-from jobscout.config_loader import load_profile
+from jobscout.derive import classify_apply_method, classify_arrangement, classify_job_type
 from jobscout.models import Listing, RateUnit, Source
 from jobscout.sources.base import BRAND_UA, CadenceRule, SourceAdapter
 
@@ -37,15 +37,6 @@ _SINGLE_EUR_HOURLY_RE = re.compile(
 
 def _to_decimal(s: str) -> Decimal:
     return Decimal(s.replace(",", "."))
-
-
-def is_company_denylisted(company: str | None) -> bool:
-    """Case-insensitive substring match against profile's `linkedin_company_denylist`. Public so structural filter can apply retroactively."""
-    if not company:
-        return False
-    haystack = company.lower()
-    denylist = load_profile().get("linkedin_company_denylist") or []
-    return any(needle.lower() in haystack for needle in denylist)
 
 
 def _parse_rate_from_description(text: str) -> tuple[Decimal | None, Decimal | None, RateUnit, str | None]:
@@ -108,10 +99,12 @@ class LinkedInSource(SourceAdapter):
             )
             for _, row in df.iterrows():
                 d: dict[str, Any] = row.to_dict()
-                if is_company_denylisted(d.get("company")):
-                    continue
+                # Company denylist deferred — re-introduce in Phase 4 from profiles.title_denylist.
                 description = str(d.get("description") or "")
                 rate_min, rate_max, rate_unit, currency = _parse_rate_from_description(description)
+                arrangement, arr_ev = classify_arrangement(d)
+                job_type_classified, jt_ev = classify_job_type(d)
+                apply_method, _am_ev = classify_apply_method("linkedin", d)
                 out.append(
                     Listing(
                         source=Source.LINKEDIN,
@@ -126,6 +119,11 @@ class LinkedInSource(SourceAdapter):
                         rate_max=rate_max,
                         rate_unit=rate_unit,
                         currency=currency,
+                        arrangement=arrangement,
+                        arrangement_evidence=arr_ev,
+                        job_type_classified=job_type_classified,
+                        job_type_evidence=jt_ev,
+                        apply_method=apply_method,
                         raw=_safe_raw(d),
                     )
                 )
