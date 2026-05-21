@@ -14,43 +14,18 @@ company_url_direct presence.
 from __future__ import annotations
 
 import json
-import re
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from jobscout.derive import classify_arrangement, first_match, haystack  # noqa: E402
+
 DIRS = [
     (ROOT / "tests" / "fixtures" / "listings" / "linkedin", "linkedin"),
     (ROOT / "tests" / "fixtures" / "listings" / "indeed", "indeed"),
-]
-
-# Arrangement patterns. Order matters: onsite (most specific) first, then
-# hybrid, then remote. Each list is checked against title + description +
-# location lowercased.
-
-_ONSITE_PATTERNS = [
-    r"\b5\s*(?:days?|tage)\s*(?:/|per\s+|im\s+|in\s+)?\s*(?:week|wk|woche)",
-    r"\bfull\s*[-\s]?(?:time|day)\s+(?:on[-\s]?site|in[-\s]?office)",
-    r"\bvollständig\s+vor\s+ort\b",
-    r"\b100\s*%\s*(?:on[-\s]?site|vor\s+ort)",
-    r"\bno\s+(?:remote|home\s+office)\b",
-    r"\bnicht\s+(?:remote|home\s+office)\b",
-]
-
-_HYBRID_PATTERNS = [
-    r"\bhybrid\b",
-    r"\b(?:few|some|2|3|4)\s*(?:days?|tage)\s*(?:/|per\s+|im\s+|in\s+)?\s*(?:week|wk|woche|office|büro)",
-    r"\b(?:days?|tage)\s+in\s+(?:the\s+)?(?:office|büro)",
-    r"\bteilweise\s+vor\s+ort\b",
-    r"\b\d+\s*(?:days?|tage)\s+(?:per|pro)?\s*(?:week|woche)?\s*(?:office|büro|on[-\s]?site|vor\s+ort)",
-]
-
-_REMOTE_PATTERNS = [
-    r"\b(?:fully|100\s*%)?\s*remote\b",
-    r"\bhome\s*[-\s]?office\b",
-    r"\bwork[-\s]?from[-\s]?home\b",
-    r"\bortsunabhängig\b",
-    r"\bmostly\s+(?:directly\s+)?at\s+your\s+home",
 ]
 
 _INTERN_PATTERNS = [
@@ -74,40 +49,9 @@ _FULLTIME_PATTERNS = [
 ]
 
 
-def _haystack(raw: dict[str, Any]) -> str:
-    parts = [
-        str(raw.get("title") or ""),
-        str(raw.get("description") or ""),
-        str(raw.get("location") or ""),
-        str(raw.get("work_from_home_type") or ""),
-    ]
-    return " ".join(parts).lower()
-
-
-def _first_match(patterns: list[str], text: str) -> str:
-    for pat in patterns:
-        m = re.search(pat, text, re.I)
-        if m:
-            return m.group(0)
-    return ""
-
-
 def _suggest_arrangement(raw: dict[str, Any]) -> tuple[str, str]:
-    wfh = (raw.get("work_from_home_type") or "").strip().lower()
-    if wfh == "hybrid":
-        return "hybrid", "indeed.work_from_home_type=Hybrid"
-    if wfh in ("remote", "temporarily remote"):
-        return "remote", f"indeed.work_from_home_type={raw['work_from_home_type']}"
-    text = _haystack(raw)
-    if hit := _first_match(_ONSITE_PATTERNS, text):
-        return "onsite", hit
-    if hit := _first_match(_HYBRID_PATTERNS, text):
-        return "hybrid", hit
-    if hit := _first_match(_REMOTE_PATTERNS, text):
-        return "remote", hit
-    if raw.get("is_remote") is True:
-        return "remote", "jobspy.is_remote=True"
-    return "unknown", ""
+    arr, ev = classify_arrangement(raw)
+    return arr.value, ev
 
 
 def _normalize_jobspy_jt(raw: dict[str, Any]) -> str:
@@ -132,16 +76,16 @@ def _suggest_job_type(raw: dict[str, Any]) -> tuple[str, str]:
     if "full" in jt or "fulltime" in jt:
         return "fulltime", f"jobspy.job_type={raw.get('job_type')!r}"
 
-    text = _haystack(raw)
-    if hit := _first_match(_INTERN_PATTERNS, text):
+    text = haystack(raw)
+    if hit := first_match(_INTERN_PATTERNS, text):
         return "intern", hit
-    if hit := _first_match(_PARTTIME_PATTERNS, text):
+    if hit := first_match(_PARTTIME_PATTERNS, text):
         return "parttime", hit
-    if hit := _first_match(_CONTRACT_PATTERNS, text):
+    if hit := first_match(_CONTRACT_PATTERNS, text):
         return "contract", hit
-    if hit := _first_match(_PERMANENT_PATTERNS, text):
+    if hit := first_match(_PERMANENT_PATTERNS, text):
         return "permanent", hit
-    if hit := _first_match(_FULLTIME_PATTERNS, text):
+    if hit := first_match(_FULLTIME_PATTERNS, text):
         return "fulltime", hit
     return "unknown", ""
 
