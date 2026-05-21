@@ -27,8 +27,14 @@ _CSS = """
   .jobscout-badge-easy { background:#f3e8ff; color:#6b21a8; }
   .jobscout-badge-dropped { background:#fee2e2; color:#991b1b; }
 
-  /* Seen-listing prefix glyph */
-  .jobscout-seen-mark { color:#16a34a; font-weight:700; margin-right:6px; }
+  /* Viewed-card left-border accent (sidegig 559c15c pattern). The marker
+     span is display:none itself; CSS :has() picks it up to style the
+     enclosing card. data-test-scroll-behavior distinguishes the card-level
+     stVerticalBlock from the page-level one (only the card has it). */
+  .jobscout-viewed-marker { display: none; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior]:has(.jobscout-viewed-marker) {
+    border-left: 4px solid #16a34a !important;
+  }
 
   /* Muted metadata row */
   .jobscout-meta { color:#6b7280; font-size:13px; }

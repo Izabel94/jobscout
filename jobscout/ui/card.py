@@ -106,9 +106,13 @@ def render(listing: dict[str, Any]) -> None:
     score_str = str(score) if score is not None else "—"
 
     with st.container(border=True):
+        # Sidegig 559c15c pattern: invisible marker triggers green left-border
+        # on the parent card via CSS :has(). Replaces the old ✓ prefix.
+        if seen:
+            st.markdown('<span class="jobscout-viewed-marker"></span>', unsafe_allow_html=True)
+
         col_title, col_score = st.columns([5, 1])
         with col_title:
-            seen_mark = '<span class="jobscout-seen-mark">✓</span>' if seen else ""
             raw = listing.get("raw") or {}
             favicon = favicon_url(
                 listing.get("url", ""),
@@ -117,7 +121,7 @@ def render(listing: dict[str, Any]) -> None:
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px">'
                 f'<img src="{favicon}" width="20" height="20" style="border-radius:4px" alt="" />'
-                f'<div style="font-weight:600;font-size:15px">{seen_mark}{_escape(listing.get("title", ""))}</div>'
+                f'<div style="font-weight:600;font-size:15px">{_escape(listing.get("title", ""))}</div>'
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -156,7 +160,10 @@ def render(listing: dict[str, Any]) -> None:
             label = "external apply" if am == ApplyMethod.EXTERNAL_APPLY else "easy apply (manual)"
             badges_html += f'<span class="{apply_method_badge_class(am)}">{label}</span>'
         if badges_html:
-            st.markdown(f'<div style="margin-top:8px">{badges_html}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="margin-top:8px;margin-bottom:14px">{badges_html}</div>',
+                unsafe_allow_html=True,
+            )
 
         with st.expander("View detail + draft", expanded=False):
             marked_key = f"marked-{listing.get('id', '')}"
