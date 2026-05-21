@@ -7,6 +7,7 @@
 # Keep in sync with pyproject.toml when bumping any of the below.
 
 streamlit>=1.32,<2
+streamlit-shadcn-ui>=0.1,<0.3
 supabase>=2.0,<3
 google-genai>=1.0,<2
 pydantic>=2.10,<3
