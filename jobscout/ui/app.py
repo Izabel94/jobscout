@@ -17,7 +17,7 @@ import streamlit as st  # noqa: E402
 from jobscout.db import (  # noqa: E402
     get_latest_draft_for_listing,
     list_onboarding_targets,
-    list_pipeline_listings,
+    list_pipeline_listings_legacy,
     list_source_runs,
     record_submission,
     update_listing_status,
@@ -326,7 +326,7 @@ with tab_pipeline:
 
     # Empty status filter → show every pipeline state.
     statuses = [ListingStatus(s) for s in (status_filter or _STATUS_OPTIONS)]
-    rows = list_pipeline_listings(statuses, limit=200)
+    rows = list_pipeline_listings_legacy(statuses, limit=200)
     if sources_pick:
         rows = [r for r in rows if r.get("source") in sources_pick]
     rows = [r for r in rows if (r.get("score") or 0) >= min_score]

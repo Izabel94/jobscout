@@ -13,7 +13,7 @@ import re
 
 import httpx
 
-from jobscout.db import list_pipeline_listings, update_listing_status
+from jobscout.db import list_pipeline_listings_legacy, update_listing_status
 from jobscout.models import ListingStatus, Source
 from jobscout.sources.base import CONTACT_UA
 
@@ -66,7 +66,7 @@ def sweep() -> tuple[int, int, int]:
     """Walk every live listing, mark dead ones EXPIRED.
     Returns (checked, expired, errors_or_skipped). `update_listing_status`
     only writes the fields passed in, so score/rationale survive."""
-    rows = list_pipeline_listings(statuses=list(_LIVE_STATUSES))
+    rows = list_pipeline_listings_legacy(statuses=list(_LIVE_STATUSES))
     checked = 0
     expired = 0
     skipped = 0
@@ -93,7 +93,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="Print what would change without writing")
     args = ap.parse_args()
     if args.dry_run:
-        rows = list_pipeline_listings(statuses=list(_LIVE_STATUSES))
+        rows = list_pipeline_listings_legacy(statuses=list(_LIVE_STATUSES))
         dead = [r for r in rows if is_listing_alive(r["url"], r["source"]) is False]
         log.info("[dry-run] would expire %d / %d", len(dead), len(rows))
         for r in dead:

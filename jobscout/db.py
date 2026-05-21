@@ -96,7 +96,7 @@ def log_source_run(source: str, listings_found: int, listings_new: int, error: s
     ).execute()
 
 
-def list_pipeline_listings(statuses: list[ListingStatus], limit: int = 100) -> list[dict[str, Any]]:
+def list_pipeline_listings_legacy(statuses: list[ListingStatus], limit: int = 100) -> list[dict[str, Any]]:
     """Listings in any of the given statuses, ordered by score desc (nulls last)."""
     if not statuses:
         return []
@@ -111,6 +111,52 @@ def list_pipeline_listings(statuses: list[ListingStatus], limit: int = 100) -> l
         .execute()
     )
     return cast(list[dict[str, Any]], res.data)
+
+
+def list_pipeline_listings(
+    *,
+    filter_kind: str = "all",
+    sort_by: str = "first_seen",
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Pipeline listings filtered by chip + sorted + paginated.
+
+    filter_kind: 'all' | 'unviewed' | 'external' | 'easy'
+    sort_by: 'first_seen' | 'score'
+    """
+    q = (
+        _client().table("listings").select("*")
+        .in_("status", ("scored", "drafted"))
+    )
+    if filter_kind == "unviewed":
+        q = q.is_("viewed_at", "null")
+    elif filter_kind == "external":
+        q = q.eq("apply_method", "external_apply")
+    elif filter_kind == "easy":
+        q = q.eq("apply_method", "easy_apply")
+
+    if sort_by == "score":
+        q = q.order("score", desc=True, nullsfirst=False)
+    else:
+        q = q.order("first_discovered_at", desc=True)
+
+    r = q.range(offset, offset + limit - 1).execute()
+    return cast(list[dict[str, Any]], r.data or [])
+
+
+def count_pipeline_listings(filter_kind: str = "all") -> int:
+    q = (
+        _client().table("listings").select("id", count="exact")
+        .in_("status", ("scored", "drafted"))
+    )
+    if filter_kind == "unviewed":
+        q = q.is_("viewed_at", "null")
+    elif filter_kind == "external":
+        q = q.eq("apply_method", "external_apply")
+    elif filter_kind == "easy":
+        q = q.eq("apply_method", "easy_apply")
+    return q.execute().count or 0
 
 
 def count_listings_new_today() -> int:

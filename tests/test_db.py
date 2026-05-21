@@ -4,7 +4,7 @@ from jobscout.db import (
     claim_one_pending_apply_request,
     get_latest_draft_for_listing,
     list_by_status,
-    list_pipeline_listings,
+    list_pipeline_listings_legacy,
     list_source_runs,
     list_unscored_new_listings,
     upsert_listing,
@@ -44,11 +44,11 @@ def test_list_unscored_new_listings_filters_status_and_null_score(mock_client):
 
 
 @patch("jobscout.db._client")
-def test_list_pipeline_listings_filters_in_and_orders_and_limits(mock_client):
+def test_list_pipeline_listings_legacy_filters_in_and_orders_and_limits(mock_client):
     chain = mock_client.return_value.table.return_value
     in_chain = chain.select.return_value.in_.return_value.order.return_value.limit.return_value
     in_chain.execute.return_value.data = [{"id": "u3", "status": "scored", "score": 80}]
-    out = list_pipeline_listings([ListingStatus.SCORED, ListingStatus.DRAFTED], limit=50)
+    out = list_pipeline_listings_legacy([ListingStatus.SCORED, ListingStatus.DRAFTED], limit=50)
     assert out == [{"id": "u3", "status": "scored", "score": 80}]
     mock_client.return_value.table.assert_called_with("listings")
     chain.select.return_value.in_.assert_called_with("status", ["scored", "drafted"])
@@ -57,8 +57,8 @@ def test_list_pipeline_listings_filters_in_and_orders_and_limits(mock_client):
 
 
 @patch("jobscout.db._client")
-def test_list_pipeline_listings_empty_statuses_returns_empty(mock_client):
-    assert list_pipeline_listings([]) == []
+def test_list_pipeline_listings_legacy_empty_statuses_returns_empty(mock_client):
+    assert list_pipeline_listings_legacy([]) == []
     mock_client.return_value.table.assert_not_called()
 
 
