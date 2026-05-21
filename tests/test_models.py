@@ -1,4 +1,4 @@
-from jobscout.models import Arrangement, ApplyMethod, JobType, Source, Listing
+from jobscout.models import ApplyMethod, Arrangement, JobType, Listing, Source
 
 
 def test_source_enum_restricted_to_linkedin_indeed():
@@ -27,15 +27,15 @@ def test_apply_method_enum():
 
 
 def test_listing_has_new_fields():
-    l = Listing(
+    listing = Listing(
         source=Source.LINKEDIN,
         source_id="abc",
         url="https://linkedin.com/jobs/view/123",
         title="ML Engineer",
         raw={},
     )
-    assert l.arrangement is None
-    assert l.job_type_classified is None
-    assert l.apply_method is None
-    assert l.arrangement_evidence is None
-    assert l.job_type_evidence is None
+    assert listing.arrangement is None
+    assert listing.job_type_classified is None
+    assert listing.apply_method is None
+    assert listing.arrangement_evidence is None
+    assert listing.job_type_evidence is None

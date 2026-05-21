@@ -77,13 +77,13 @@ def test_linkedin_source_populates_derived_fields(monkeypatch):
     listings = src.discover()
 
     assert len(listings) > 0
-    for l in listings:
-        assert l.source == Source.LINKEDIN
-        assert l.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY), l.url
-        assert l.arrangement in tuple(Arrangement), l.url
-        assert l.job_type_classified in tuple(JobType), l.url
+    for listing in listings:
+        assert listing.source == Source.LINKEDIN
+        assert listing.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY), listing.url
+        assert listing.arrangement in tuple(Arrangement), listing.url
+        assert listing.job_type_classified in tuple(JobType), listing.url
     # All LinkedIn listings are easy_apply (per the empirical finding)
-    assert all(l.apply_method == ApplyMethod.EASY_APPLY for l in listings)
+    assert all(listing.apply_method == ApplyMethod.EASY_APPLY for listing in listings)
 
 
 def test_linkedin_source_attaches_evidence_strings(monkeypatch):
@@ -96,5 +96,5 @@ def test_linkedin_source_attaches_evidence_strings(monkeypatch):
     listings = src.discover()
 
     # At least some have arrangement_evidence (hybrid/remote classifications)
-    with_evidence = [l for l in listings if l.arrangement_evidence]
+    with_evidence = [listing for listing in listings if listing.arrangement_evidence]
     assert len(with_evidence) > 0

@@ -47,7 +47,7 @@ SEARCH_TERMS = [
 def _safe(d: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for k, v in d.items():
-        if v is None or isinstance(v, (str, int, float, bool, list, dict)):
+        if v is None or isinstance(v, str | int | float | bool | list | dict):
             out[str(k)] = v
         else:
             out[str(k)] = str(v)

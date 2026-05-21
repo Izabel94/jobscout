@@ -59,22 +59,20 @@ def test_keep_unknown_job_type():
 
 
 def test_drop_high_confidence_onsite():
-    assert pass_structural(
-        _listing(arrangement=Arrangement.ONSITE, arrangement_evidence="5 days/week in office")
-    ) is False
+    assert (
+        pass_structural(_listing(arrangement=Arrangement.ONSITE, arrangement_evidence="5 days/week in office")) is False
+    )
 
 
 def test_drop_high_confidence_onsite_german():
-    assert pass_structural(
-        _listing(arrangement=Arrangement.ONSITE, arrangement_evidence="vollständig vor ort")
-    ) is False
+    assert (
+        pass_structural(_listing(arrangement=Arrangement.ONSITE, arrangement_evidence="vollständig vor ort")) is False
+    )
 
 
 def test_keep_low_confidence_onsite():
     # arrangement=ONSITE but no high-confidence evidence — pass through (let LLM decide)
-    assert pass_structural(
-        _listing(arrangement=Arrangement.ONSITE, arrangement_evidence="büro")
-    ) is True
+    assert pass_structural(_listing(arrangement=Arrangement.ONSITE, arrangement_evidence="büro")) is True
 
 
 def test_keep_hybrid():

@@ -7,19 +7,9 @@ import pytest
 from jobscout.draft import _extract_contact_name, _verify_cv_facts, draft_one
 from jobscout.models import Draft, Listing, ListingStatus, Source
 
-_CV_BASE_EN = (
-    "# Test User\n\n"
-    "## Work\n\n"
-    "### Acme Corp | Berlin\n"
-    "*2019 – 2021*\n\n"
-    "- Built things.\n"
-)
+_CV_BASE_EN = "# Test User\n\n" "## Work\n\n" "### Acme Corp | Berlin\n" "*2019 - 2021*\n\n" "- Built things.\n"
 _CV_BASE_DE = (
-    "# Test User\n\n"
-    "## Berufserfahrung\n\n"
-    "### Acme Corp | Berlin\n"
-    "*2019 – 2021*\n\n"
-    "- Dinge gebaut.\n"
+    "# Test User\n\n" "## Berufserfahrung\n\n" "### Acme Corp | Berlin\n" "*2019 - 2021*\n\n" "- Dinge gebaut.\n"
 )
 
 

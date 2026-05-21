@@ -29,11 +29,11 @@ def test_indeed_source_populates_derived_fields(monkeypatch):
     listings = src.discover()
 
     assert len(listings) > 0
-    for l in listings:
-        assert l.source == Source.INDEED
-        assert l.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY)
-        assert l.arrangement in tuple(Arrangement)
-        assert l.job_type_classified in tuple(JobType)
+    for listing in listings:
+        assert listing.source == Source.INDEED
+        assert listing.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY)
+        assert listing.arrangement in tuple(Arrangement)
+        assert listing.job_type_classified in tuple(JobType)
 
 
 def test_indeed_source_split_apply_methods(monkeypatch):
@@ -47,6 +47,6 @@ def test_indeed_source_split_apply_methods(monkeypatch):
     src = ind_mod.IndeedSource(search_terms=["test"], location="Hamburg", country="germany")
     listings = src.discover()
 
-    methods = {l.apply_method for l in listings}
+    methods = {listing.apply_method for listing in listings}
     assert ApplyMethod.EXTERNAL_APPLY in methods
     assert ApplyMethod.EASY_APPLY in methods

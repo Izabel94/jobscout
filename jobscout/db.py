@@ -117,7 +117,7 @@ def list_source_runs(limit: int = 40) -> list[dict[str, Any]]:
 def get_profile(linkedin_url: str) -> dict[str, Any] | None:
     """Returns the single profile row matching linkedin_url, or None."""
     r = _client().table("profiles").select("*").eq("linkedin_url", linkedin_url).execute()
-    rows = r.data or []
+    rows = cast(list[dict[str, Any]], r.data or [])
     return rows[0] if rows else None
 
 
@@ -160,7 +160,8 @@ def insert_apply_request(*, listing_id: str, source: str) -> str:
         .insert({"listing_id": listing_id, "source": source, "status": "pending"})
         .execute()
     )
-    return cast(str, res.data[0]["id"])
+    rows = cast(list[dict[str, Any]], res.data)
+    return cast(str, rows[0]["id"])
 
 
 def claim_one_pending_apply_request() -> dict[str, Any] | None:
@@ -169,7 +170,7 @@ def claim_one_pending_apply_request() -> dict[str, Any] | None:
     res = client.table("apply_requests").select("*").eq("status", "pending").order("requested_at").limit(1).execute()
     if not res.data:
         return None
-    candidate = res.data[0]
+    candidate = cast(dict[str, Any], res.data[0])
     upd = (
         client.table("apply_requests")
         .update({"status": "processing", "claimed_at": "now()"})
@@ -179,12 +180,10 @@ def claim_one_pending_apply_request() -> dict[str, Any] | None:
     )
     if not upd.data:
         return None
-    return cast(dict[str, Any], candidate)
+    return candidate
 
 
-def mark_apply_request_done(
-    request_id: str, *, executed_draft_id: str | None, notes: str | None = None
-) -> None:
+def mark_apply_request_done(request_id: str, *, executed_draft_id: str | None, notes: str | None = None) -> None:
     """Transition an apply_request from 'processing' to 'done'."""
     payload: dict[str, Any] = {
         "status": "done",
@@ -196,9 +195,7 @@ def mark_apply_request_done(
     _client().table("apply_requests").update(payload).eq("id", request_id).execute()
 
 
-def mark_apply_request_failed(
-    request_id: str, *, error: str, notes: str | None = None
-) -> None:
+def mark_apply_request_failed(request_id: str, *, error: str, notes: str | None = None) -> None:
     """Transition an apply_request from 'processing' to 'failed'."""
     payload: dict[str, Any] = {
         "status": "failed",
@@ -226,12 +223,5 @@ def recover_stale_apply_claims(*, stale_after_minutes: int = 30) -> int:
 
 def list_apply_requests(*, limit: int = 50) -> list[dict[str, Any]]:
     """Most recent apply_requests, newest first."""
-    res = (
-        _client()
-        .table("apply_requests")
-        .select("*")
-        .order("requested_at", desc=True)
-        .limit(limit)
-        .execute()
-    )
+    res = _client().table("apply_requests").select("*").order("requested_at", desc=True).limit(limit).execute()
     return cast(list[dict[str, Any]], res.data or [])
