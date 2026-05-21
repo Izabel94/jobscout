@@ -51,6 +51,30 @@ REMOTE_PATTERNS = [
     r"\bmostly\s+(?:directly\s+)?at\s+your\s+home",
 ]
 
+INTERN_PATTERNS = [
+    r"\b(?:intern(?:ship)?|praktikum|werkstudent)\b",
+]
+
+PARTTIME_PATTERNS = [
+    r"\b(?:part[-\s]?time|teilzeit)\b",
+    r"\b(?:20|24|25|30)\s*(?:h|hours?|stunden?)\s*/?\s*(?:per\s+|pro\s+)?(?:week|woche)\b",
+]
+
+CONTRACT_PATTERNS = [
+    r"\b(?:contract|contractor|freelance|freiberuflich)\b",
+    r"\bbefristet\b",
+    r"\bfixed[-\s]?term\b",
+]
+
+PERMANENT_PATTERNS = [
+    r"\b(?:permanent|unbefristet|festanstellung)\b",
+]
+
+FULLTIME_PATTERNS = [
+    r"\b(?:full[-\s]?time|fulltime|vollzeit)\b",
+    r"\b40\s*(?:h|hours?|stunden?)\s*/?\s*(?:per\s+|pro\s+)?(?:week|woche)\b",
+]
+
 
 def _str(v: Any) -> str:
     if v is None:
@@ -90,8 +114,39 @@ def classify_arrangement(raw: dict[str, Any]) -> tuple[Arrangement, str]:
     return Arrangement.UNKNOWN, ""
 
 
+def normalize_jobspy_job_type(raw: dict[str, Any]) -> str:
+    """JobSpy may surface job_type as str, list[str], None, or NaN-float."""
+    jt = raw.get("job_type")
+    if isinstance(jt, list):
+        return " ".join(_str(x) for x in jt).lower()
+    return _str(jt).lower()
+
+
 def classify_job_type(raw: dict[str, Any]) -> tuple[JobType, str]:
-    raise NotImplementedError  # Task 6
+    jt = normalize_jobspy_job_type(raw)
+    if "intern" in jt:
+        return JobType.INTERN, f"jobspy.job_type={raw.get('job_type')!r}"
+    if "part" in jt and "full" not in jt:
+        return JobType.PARTTIME, f"jobspy.job_type={raw.get('job_type')!r}"
+    if "contract" in jt or "temporary" in jt:
+        return JobType.CONTRACT, f"jobspy.job_type={raw.get('job_type')!r}"
+    if "permanent" in jt:
+        return JobType.PERMANENT, f"jobspy.job_type={raw.get('job_type')!r}"
+    if "full" in jt or "fulltime" in jt:
+        return JobType.FULLTIME, f"jobspy.job_type={raw.get('job_type')!r}"
+
+    text = haystack(raw)
+    if hit := first_match(INTERN_PATTERNS, text):
+        return JobType.INTERN, hit
+    if hit := first_match(PARTTIME_PATTERNS, text):
+        return JobType.PARTTIME, hit
+    if hit := first_match(CONTRACT_PATTERNS, text):
+        return JobType.CONTRACT, hit
+    if hit := first_match(PERMANENT_PATTERNS, text):
+        return JobType.PERMANENT, hit
+    if hit := first_match(FULLTIME_PATTERNS, text):
+        return JobType.FULLTIME, hit
+    return JobType.UNKNOWN, ""
 
 
 def classify_apply_method(raw: dict[str, Any]) -> tuple[ApplyMethod, str]:

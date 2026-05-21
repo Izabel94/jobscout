@@ -21,31 +21,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from jobscout.derive import classify_arrangement, first_match, haystack  # noqa: E402
+from jobscout.derive import classify_arrangement, classify_job_type  # noqa: E402
 
 DIRS = [
     (ROOT / "tests" / "fixtures" / "listings" / "linkedin", "linkedin"),
     (ROOT / "tests" / "fixtures" / "listings" / "indeed", "indeed"),
-]
-
-_INTERN_PATTERNS = [
-    r"\b(?:intern(?:ship)?|praktikum|werkstudent)\b",
-]
-_PARTTIME_PATTERNS = [
-    r"\b(?:part[-\s]?time|teilzeit)\b",
-    r"\b(?:20|24|25|30)\s*(?:h|hours?|stunden?)\s*/?\s*(?:per\s+|pro\s+)?(?:week|woche)\b",
-]
-_CONTRACT_PATTERNS = [
-    r"\b(?:contract|contractor|freelance|freiberuflich)\b",
-    r"\bbefristet\b",
-    r"\bfixed[-\s]?term\b",
-]
-_PERMANENT_PATTERNS = [
-    r"\b(?:permanent|unbefristet|festanstellung)\b",
-]
-_FULLTIME_PATTERNS = [
-    r"\b(?:full[-\s]?time|fulltime|vollzeit)\b",
-    r"\b40\s*(?:h|hours?|stunden?)\s*/?\s*(?:per\s+|pro\s+)?(?:week|woche)\b",
 ]
 
 
@@ -54,40 +34,9 @@ def _suggest_arrangement(raw: dict[str, Any]) -> tuple[str, str]:
     return arr.value, ev
 
 
-def _normalize_jobspy_jt(raw: dict[str, Any]) -> str:
-    jt = raw.get("job_type")
-    if isinstance(jt, list):
-        return " ".join(str(x) for x in jt).lower()
-    if isinstance(jt, str):
-        return jt.lower()
-    return ""  # None, NaN, etc.
-
-
 def _suggest_job_type(raw: dict[str, Any]) -> tuple[str, str]:
-    jt = _normalize_jobspy_jt(raw)
-    if "intern" in jt:
-        return "intern", f"jobspy.job_type={raw.get('job_type')!r}"
-    if "part" in jt and "full" not in jt:
-        return "parttime", f"jobspy.job_type={raw.get('job_type')!r}"
-    if "contract" in jt or "temporary" in jt:
-        return "contract", f"jobspy.job_type={raw.get('job_type')!r}"
-    if "permanent" in jt:
-        return "permanent", f"jobspy.job_type={raw.get('job_type')!r}"
-    if "full" in jt or "fulltime" in jt:
-        return "fulltime", f"jobspy.job_type={raw.get('job_type')!r}"
-
-    text = haystack(raw)
-    if hit := first_match(_INTERN_PATTERNS, text):
-        return "intern", hit
-    if hit := first_match(_PARTTIME_PATTERNS, text):
-        return "parttime", hit
-    if hit := first_match(_CONTRACT_PATTERNS, text):
-        return "contract", hit
-    if hit := first_match(_PERMANENT_PATTERNS, text):
-        return "permanent", hit
-    if hit := first_match(_FULLTIME_PATTERNS, text):
-        return "fulltime", hit
-    return "unknown", ""
+    jt, ev = classify_job_type(raw)
+    return jt.value, ev
 
 
 def _apply_method_for(source: str, raw: dict[str, Any]) -> str:
