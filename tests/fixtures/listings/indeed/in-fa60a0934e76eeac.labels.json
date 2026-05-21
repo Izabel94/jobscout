@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "remote",
+  "arrangement_evidence": "remote",
+  "expected_job_type": "fulltime",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
+  "expected_apply_method": "easy_apply",
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
+}

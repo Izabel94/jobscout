@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "hybrid",
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing mentions the possibility of working mobile up to 3 days a week, indicating a hybrid arrangement.",
-  "job_type_reasoning": "The listing explicitly states 'fulltime' in the provided fields and context implies a permanent role.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash-lite"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

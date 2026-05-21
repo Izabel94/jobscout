@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "hybrid",
+  "expected_arrangement": "remote",
+  "arrangement_evidence": "remote",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing states remote work is possible but employees are expected to be in the office 3-4 days a week.",
-  "job_type_reasoning": "The listing specifies 'fulltime' and mentions flexible hours from 32 to 40 hours, which falls under the full-time category.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash-lite"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "onsite",
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing states 'is_remote: False', specifies a location (Hamburg), and mentions working at 'bundesweiten Standorten' (nationwide locations) without indicating any remote or hybrid options.",
-  "job_type_reasoning": "The listing explicitly states 'job_type: fulltime' and provides no information suggesting otherwise, such as permanent, part-time, or intern.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

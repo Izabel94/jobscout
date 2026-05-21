@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
+  "expected_job_type": "unknown",
+  "job_type_evidence": "",
+  "expected_apply_method": "external_apply",
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
+}

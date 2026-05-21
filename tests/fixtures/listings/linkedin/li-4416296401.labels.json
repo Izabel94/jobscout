@@ -1,0 +1,9 @@
+{
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
+  "expected_job_type": "parttime",
+  "job_type_evidence": "jobspy.job_type='parttime'",
+  "expected_apply_method": "easy_apply",
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
+}

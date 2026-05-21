@@ -1,9 +1,9 @@
 {
   "expected_arrangement": "hybrid",
+  "arrangement_evidence": "hybrid",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The job description explicitly states 'We work in a hybrid setup with 3 core office days, plus flexible working hours.'",
-  "job_type_reasoning": "The job listing specifies 'job_type: fulltime' and the description does not indicate otherwise or mention 'permanent'.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

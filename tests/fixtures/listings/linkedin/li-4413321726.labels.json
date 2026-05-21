@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "onsite",
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing explicitly states 'is_remote: False', 'work_from_home_type: None', and highlights a 'Top Location' with office amenities.",
-  "job_type_reasoning": "The 'job_type' field explicitly states 'fulltime' and no other job type is mentioned in the listing.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

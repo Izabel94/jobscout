@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "onsite",
-  "expected_job_type": "permanent",
-  "arrangement_reasoning": "The listing explicitly states 'is_remote: False' and mentions the role is at 'Evotec’s headquarters in Hamburg, Germany' with no indication of remote or hybrid work.",
-  "job_type_reasoning": "The job description and title both explicitly state 'Full time and permanent', and the 'permanent' type takes precedence over 'fulltime' when both are present.",
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
+  "expected_job_type": "fulltime",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

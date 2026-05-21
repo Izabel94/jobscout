@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "hybrid",
+  "expected_arrangement": "remote",
+  "arrangement_evidence": "fully remote",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing explicitly states 'a fully remote position is not feasible' but offers 'flexibility of home office days' and requires candidates to 'join us at our office in Hamburg'.",
-  "job_type_reasoning": "The listing explicitly states 'job_type: fulltime' and provides no other information to contradict or supersede this.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

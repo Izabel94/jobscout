@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "onsite",
+  "expected_arrangement": "unknown",
+  "arrangement_evidence": "",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing explicitly states 'bundesweiten Standorten' which implies an on-site presence is required.",
-  "job_type_reasoning": "The job listing specifies 'fulltime' as the job type.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash-lite"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }

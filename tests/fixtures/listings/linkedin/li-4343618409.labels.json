@@ -1,9 +1,9 @@
 {
-  "expected_arrangement": "onsite",
+  "expected_arrangement": "hybrid",
+  "arrangement_evidence": "hybrid",
   "expected_job_type": "fulltime",
-  "arrangement_reasoning": "The listing specifies the location as Hamburg, Hamburg, Germany and states the candidate will work 'mostly directly at your home location' which implies an on-site presence, though with potential for some remote work depending on the client situation.",
-  "job_type_reasoning": "The job title explicitly states 'Senior Java Developer' and the description implies a long-term, continuous role within agile teams, characteristic of a full-time position.",
+  "job_type_evidence": "jobspy.job_type='fulltime'",
   "expected_apply_method": "easy_apply",
-  "verified_by_operator": false,
-  "labeler": "gemini-2.5-flash-lite"
+  "labeler": "regex-heuristic",
+  "verified_by_operator": false
 }
