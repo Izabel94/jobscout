@@ -18,7 +18,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from jobscout.apply import external_ats
+# pyproject has `package-mode = false`, so jobscout isn't installed; put the
+# repo root on sys.path so this script works when launched as `python scripts/...`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from jobscout.apply import external_ats  # noqa: E402
 
 # Greenhouse's own public application for Forward Deployed Engineer (Ontario).
 # Has ~20 fields covering text/email/select/file/textarea/checkbox — a thorough
