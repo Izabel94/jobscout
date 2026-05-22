@@ -27,6 +27,25 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from jobscout.llm import LLMJSONError, call_json
 
+
+class EasyApplyAfterClickError(RuntimeError):
+    """Raised when the apply flow lands on linkedin.com/jobs/easyApply/* despite
+    the listing being classified as EXTERNAL_APPLY. The worker catches this,
+    marks the apply_request failed, and flips listings.apply_method to easy_apply
+    so the row surfaces under the manual section next time.
+    """
+
+
+_EASY_APPLY_HOST_FRAGMENT = "linkedin.com"
+_EASY_APPLY_PATH_FRAGMENT = "/jobs/easyApply/"
+
+
+def _assert_not_easy_apply(page: Page) -> None:
+    url = (page.url or "").lower()
+    if _EASY_APPLY_HOST_FRAGMENT in url and _EASY_APPLY_PATH_FRAGMENT.lower() in url:
+        raise EasyApplyAfterClickError(f"landed on Easy Apply URL: {page.url}")
+
+
 _PAGE_THINK_SECONDS = (10.0, 18.0)
 _FIELD_THINK_SECONDS = (0.6, 1.8)
 
@@ -506,6 +525,8 @@ def _run(
 
         page = _walk_to_form(context, page)
         print(f"Form page: {page.url}", flush=True)
+
+        _assert_not_easy_apply(page)
 
         if _dismiss_consent_banner(page):
             print("  dismissed consent banner", flush=True)
