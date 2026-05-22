@@ -89,15 +89,24 @@ def _record_submission_and_mark_done(request_id: str, listing_id: str, draft_id:
     mark_apply_request_done(request_id, executed_draft_id=draft_id, notes=None)
 
 
+def _flip_listing_to_easy_apply(listing_id: str) -> None:
+    """Promote a misclassified EXTERNAL_APPLY listing to EASY_APPLY so the UI
+    surfaces it under the manual section next time."""
+    from jobscout.db import _client
+
+    _client().table("listings").update({"apply_method": "easy_apply"}).eq("id", listing_id).execute()
+
+
 def process_one(row: dict[str, Any]) -> None:
-    """Dispatch a single apply_request. All errors are caught; the row is marked
-    failed so the worker loop survives. Stale-claim recovery handles crashes
-    that prevent us from reaching either done- or failed-mark."""
     request_id = row["id"]
     try:
         listing = _fetch_listing(row["listing_id"])
         if listing is None:
             raise RuntimeError(f"listing {row['listing_id']} not found")
+        if listing.get("apply_method") != "external_apply":
+            mark_apply_request_failed(request_id, error="easy_apply_after_claim", notes=None)
+            return
+
         draft = _fetch_latest_draft(row["listing_id"])
         if draft is None:
             raise RuntimeError(f"no draft for listing {row['listing_id']}")
@@ -106,14 +115,20 @@ def process_one(row: dict[str, Any]) -> None:
 
         from jobscout.apply import external_ats
 
-        external_ats.apply(
-            ats_url=_ats_url_for(listing),
-            proposal=draft["body"],
-            cv_pdf_path=cv_pdf_path,
-            listing_title=listing.get("title") or "",
-            listing_description=listing.get("description") or "",
-            adapted_cv_md=draft["adapted_cv"],
-        )
+        try:
+            external_ats.apply(
+                ats_url=_ats_url_for(listing),
+                proposal=draft["body"],
+                cv_pdf_path=cv_pdf_path,
+                listing_title=listing.get("title") or "",
+                listing_description=listing.get("description") or "",
+                adapted_cv_md=draft["adapted_cv"],
+            )
+        except external_ats.EasyApplyAfterClickError:
+            _flip_listing_to_easy_apply(listing["id"])
+            mark_apply_request_failed(request_id, error="easy_apply_detected_at_click", notes=None)
+            return
+
         _record_submission_and_mark_done(request_id, listing["id"], draft["id"])
     except Exception as e:
         log.exception("apply request %s failed", request_id)

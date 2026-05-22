@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -84,3 +84,54 @@ def test_process_one_falls_back_to_listing_url_when_no_company_url_direct(
 
     calls, _ = fake_external_apply
     assert calls[0]["ats_url"] == "https://example.com/apply"
+
+
+def test_process_one_rejects_easy_apply_listing(monkeypatch):
+    from jobscout.apply import worker
+
+    listing = {
+        "id": "l1", "title": "T", "description": "D", "url": "https://x",
+        "company_url_direct": None, "apply_method": "easy_apply", "source": "linkedin",
+    }
+    monkeypatch.setattr(worker, "_fetch_listing", lambda _: listing)
+    monkeypatch.setattr(worker, "_fetch_latest_draft", lambda _: {"id": "d", "body": "", "adapted_cv": ""})
+    failed: list[tuple[str, str]] = []
+    monkeypatch.setattr(worker, "mark_apply_request_failed",
+                        lambda rid, *, error, notes=None: failed.append((rid, error)))
+    fired = []
+    monkeypatch.setattr("jobscout.apply.external_ats.apply",
+                        lambda **kw: fired.append(kw))
+
+    worker.process_one({"id": "r1", "listing_id": "l1", "source": "linkedin"})
+
+    assert fired == []
+    assert failed == [("r1", "easy_apply_after_claim")]
+
+
+def test_process_one_flips_apply_method_on_easy_apply_after_click(monkeypatch):
+    from jobscout.apply import external_ats, worker
+
+    listing = {
+        "id": "l1", "title": "T", "description": "D", "url": "https://x",
+        "company_url_direct": "https://x", "apply_method": "external_apply", "source": "linkedin",
+    }
+    monkeypatch.setattr(worker, "_fetch_listing", lambda _: listing)
+    monkeypatch.setattr(worker, "_fetch_latest_draft",
+                        lambda _: {"id": "d", "body": "b", "adapted_cv": "c"})
+    monkeypatch.setattr(worker, "_render_cv_pdf", lambda *a, **kw: Path("/tmp/cv.pdf"))
+
+    def _raise(**_kw):
+        raise external_ats.EasyApplyAfterClickError("landed on /jobs/easyApply/")
+    monkeypatch.setattr("jobscout.apply.external_ats.apply", _raise)
+
+    flips: list[str] = []
+    monkeypatch.setattr(worker, "_flip_listing_to_easy_apply",
+                        lambda listing_id: flips.append(listing_id))
+    failed: list[tuple[str, str]] = []
+    monkeypatch.setattr(worker, "mark_apply_request_failed",
+                        lambda rid, *, error, notes=None: failed.append((rid, error)))
+
+    worker.process_one({"id": "r1", "listing_id": "l1", "source": "linkedin"})
+
+    assert flips == ["l1"]
+    assert failed == [("r1", "easy_apply_detected_at_click")]
