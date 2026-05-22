@@ -5,6 +5,8 @@ Playwright MCP at the end of each phase block."""
 
 from __future__ import annotations
 
+from typing import Any
+
 import streamlit as st
 
 from jobscout.db import (
@@ -50,20 +52,20 @@ def render_kpi_hero() -> None:
 
 
 _PAGE_SIZE = 20
-_FILTERS = [
-    ("all", "All"),
-    ("unviewed", "Unviewed"),
-    ("external", "External apply"),
-    ("easy", "Easy apply"),
-]
+_APPLY_METHOD_OPTIONS = ["external_apply", "easy_apply"]
+_APPLY_METHOD_LABELS = {"external_apply": "External apply", "easy_apply": "Easy apply"}
 _SORTS = {"first_seen": "First seen (newest)", "score": "Score (highest)"}
 
 
 def render_sidebar_filters() -> None:
-    """Sidebar filters (sidegig pattern). Writes filter_kind + sort_by into
-    session_state. Replaces the old chip-row layout that had alignment issues."""
-    if "filter_kind" not in st.session_state:
-        st.session_state["filter_kind"] = "all"
+    """Sidebar filters (sidegig pattern) — multiselect apply method + score
+    slider + only-unviewed checkbox + sort dropdown. All filters AND together."""
+    if "apply_methods" not in st.session_state:
+        st.session_state["apply_methods"] = []
+    if "min_score" not in st.session_state:
+        st.session_state["min_score"] = 0
+    if "only_unviewed" not in st.session_state:
+        st.session_state["only_unviewed"] = False
     if "sort_by" not in st.session_state:
         st.session_state["sort_by"] = "first_seen"
     if "page" not in st.session_state:
@@ -72,18 +74,40 @@ def render_sidebar_filters() -> None:
     with st.sidebar:
         st.markdown("### Pipeline filters")
 
-        # Compute counts so labels show how many listings each filter would surface.
-        counts = {key: count_pipeline_listings(filter_kind=key) for key, _ in _FILTERS}
-
-        new_filter = st.radio(
-            "Show",
-            options=[key for key, _ in _FILTERS],
-            format_func=lambda k: f"{dict(_FILTERS)[k]} ({counts[k]})",
-            index=[key for key, _ in _FILTERS].index(st.session_state["filter_kind"]),
-            key="filter-radio",
+        new_methods = st.multiselect(
+            "Apply method",
+            options=_APPLY_METHOD_OPTIONS,
+            format_func=lambda k: _APPLY_METHOD_LABELS[k],
+            default=st.session_state["apply_methods"],
+            key="filter-methods",
+            help="Empty = both",
         )
-        if new_filter != st.session_state["filter_kind"]:
-            st.session_state["filter_kind"] = new_filter
+        if new_methods != st.session_state["apply_methods"]:
+            st.session_state["apply_methods"] = new_methods
+            st.session_state["page"] = 0
+            st.rerun()
+
+        new_score = st.slider(
+            "Min score",
+            min_value=0,
+            max_value=100,
+            value=st.session_state["min_score"],
+            step=5,
+            key="filter-score",
+        )
+        if new_score != st.session_state["min_score"]:
+            st.session_state["min_score"] = new_score
+            st.session_state["page"] = 0
+            st.rerun()
+
+        new_unviewed = st.checkbox(
+            "Only unviewed",
+            value=st.session_state["only_unviewed"],
+            key="filter-unviewed",
+            help="Hide listings you've already opened.",
+        )
+        if new_unviewed != st.session_state["only_unviewed"]:
+            st.session_state["only_unviewed"] = new_unviewed
             st.session_state["page"] = 0
             st.rerun()
 
@@ -104,14 +128,22 @@ def render_sidebar_filters() -> None:
 render_filter_bar = render_sidebar_filters
 
 
+def _current_filter_args() -> dict[str, Any]:
+    return {
+        "apply_methods": st.session_state.get("apply_methods") or None,
+        "min_score": int(st.session_state.get("min_score") or 0),
+        "only_unviewed": bool(st.session_state.get("only_unviewed")),
+    }
+
+
 def render_listing_list() -> None:
-    fk = st.session_state.get("filter_kind", "all")
+    filters = _current_filter_args()
     sb = st.session_state.get("sort_by", "first_seen")
     page = st.session_state.get("page", 0)
     offset = page * _PAGE_SIZE
 
-    total = count_pipeline_listings(filter_kind=fk)
-    listings = list_pipeline_listings(filter_kind=fk, sort_by=sb, limit=_PAGE_SIZE, offset=offset)
+    total = count_pipeline_listings(**filters)
+    listings = list_pipeline_listings(**filters, sort_by=sb, limit=_PAGE_SIZE, offset=offset)
 
     if total == 0:
         render_empty_state()
@@ -141,10 +173,12 @@ def render_listing_list() -> None:
 
 
 def render_empty_state() -> None:
-    fk = st.session_state.get("filter_kind", "all")
-    if fk != "all":
-        # Filter excludes everything — sidebar radio is the way to clear it.
-        st.info("No listings match the current filter. Adjust the sidebar to see more.")
+    filters = _current_filter_args()
+    any_filter_active = (
+        filters["apply_methods"] or filters["min_score"] > 0 or filters["only_unviewed"]
+    )
+    if any_filter_active:
+        st.info("No listings match the current filters. Adjust the sidebar to see more.")
         return
 
     # No listings at all — friendly copy + last-run summary if available

@@ -113,49 +113,65 @@ def list_pipeline_listings_legacy(statuses: list[ListingStatus], limit: int = 10
     return cast(list[dict[str, Any]], res.data)
 
 
+def _apply_pipeline_filters(
+    q: Any,
+    *,
+    apply_methods: list[str] | None,
+    min_score: int,
+    only_unviewed: bool,
+) -> Any:
+    """Apply the sidebar filter set to a Supabase query builder. Used by
+    both list_pipeline_listings and count_pipeline_listings so the count
+    chip-labels stay honest."""
+    q = q.in_("status", ("scored", "drafted"))
+    if apply_methods:
+        q = q.in_("apply_method", tuple(apply_methods))
+    if min_score > 0:
+        q = q.gte("score", min_score)
+    if only_unviewed:
+        q = q.is_("viewed_at", "null")
+    return q
+
+
 def list_pipeline_listings(
     *,
-    filter_kind: str = "all",
+    apply_methods: list[str] | None = None,
+    min_score: int = 0,
+    only_unviewed: bool = False,
     sort_by: str = "first_seen",
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Pipeline listings filtered by chip + sorted + paginated.
+    """Pipeline listings filtered (multi-dimensional) + sorted + paginated.
 
-    filter_kind: 'all' | 'unviewed' | 'external' | 'easy'
     sort_by: 'first_seen' | 'score'
     """
-    q = (
-        _client().table("listings").select("*")
-        .in_("status", ("scored", "drafted"))
+    q = _apply_pipeline_filters(
+        _client().table("listings").select("*"),
+        apply_methods=apply_methods,
+        min_score=min_score,
+        only_unviewed=only_unviewed,
     )
-    if filter_kind == "unviewed":
-        q = q.is_("viewed_at", "null")
-    elif filter_kind == "external":
-        q = q.eq("apply_method", "external_apply")
-    elif filter_kind == "easy":
-        q = q.eq("apply_method", "easy_apply")
-
     if sort_by == "score":
         q = q.order("score", desc=True, nullsfirst=False)
     else:
         q = q.order("first_discovered_at", desc=True)
-
     r = q.range(offset, offset + limit - 1).execute()
     return cast(list[dict[str, Any]], r.data or [])
 
 
-def count_pipeline_listings(filter_kind: str = "all") -> int:
-    q = (
-        _client().table("listings").select("id", count="exact")
-        .in_("status", ("scored", "drafted"))
+def count_pipeline_listings(
+    *,
+    apply_methods: list[str] | None = None,
+    min_score: int = 0,
+    only_unviewed: bool = False,
+) -> int:
+    q = _apply_pipeline_filters(
+        _client().table("listings").select("id", count="exact"),
+        apply_methods=apply_methods,
+        min_score=min_score,
+        only_unviewed=only_unviewed,
     )
-    if filter_kind == "unviewed":
-        q = q.is_("viewed_at", "null")
-    elif filter_kind == "external":
-        q = q.eq("apply_method", "external_apply")
-    elif filter_kind == "easy":
-        q = q.eq("apply_method", "easy_apply")
     return q.execute().count or 0
 
 
