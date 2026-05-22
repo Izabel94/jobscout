@@ -7,7 +7,7 @@ to the Submit step; the user clicks Submit.
 Flow: attach to CDP Chrome → walk apply-CTA hops → enumerate fields →
 one LLM call to map fields to actions → apply each action → pause.
 
-We reuse the `UPWORK_CDP_URL` env var — same CDP Chrome instance for all
+We reuse the `JOBSCOUT_CDP_URL` env var — same CDP Chrome instance for all
 auto-apply flows.
 """
 
@@ -25,8 +25,26 @@ from urllib.parse import urlparse
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
-from jobscout.config_loader import load_profile
 from jobscout.llm import LLMJSONError, call_json
+
+
+class EasyApplyAfterClickError(RuntimeError):
+    """Raised when the apply flow lands on linkedin.com/jobs/easyApply/* despite
+    the listing being classified as EXTERNAL_APPLY. The worker catches this,
+    marks the apply_request failed, and flips listings.apply_method to easy_apply
+    so the row surfaces under the manual section next time.
+    """
+
+
+_EASY_APPLY_HOST_FRAGMENT = "linkedin.com"
+_EASY_APPLY_PATH_FRAGMENT = "/jobs/easyApply/"
+
+
+def _assert_not_easy_apply(page: Page) -> None:
+    url = (page.url or "").lower()
+    if _EASY_APPLY_HOST_FRAGMENT in url and _EASY_APPLY_PATH_FRAGMENT.lower() in url:
+        raise EasyApplyAfterClickError(f"landed on Easy Apply URL: {page.url}")
+
 
 _PAGE_THINK_SECONDS = (10.0, 18.0)
 _FIELD_THINK_SECONDS = (0.6, 1.8)
@@ -202,33 +220,28 @@ def _render_field_list(fields: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _candidate_context(profile: dict[str, Any]) -> dict[str, str]:
-    contact = profile.get("candidate_contact") or {}
-    sensitive = profile.get("sensitive_field_defaults") or {}
-    languages = profile.get("candidate_languages") or {}
-    sens_lines = (
-        "\n".join(f"  - {k}: {v}" for k, v in sensitive.items())
-        if sensitive
-        else "  (none configured)"
-    )
+def _candidate_context(profile_row: dict[str, Any]) -> dict[str, str]:
+    """Map a jobscout `profiles` row to the placeholder dict the prompt template expects."""
+    languages = profile_row.get("languages") or {}
     lang_lines = (
         "\n".join(f"  - {lang}: {level}" for lang, level in languages.items())
         if languages
         else "  (none configured)"
     )
+    rate_eur = profile_row.get("target_rate_floor_eur")
     return {
-        "candidate_name": str(profile.get("name", "")),
-        "candidate_email": contact.get("email", ""),
-        "candidate_phone": contact.get("phone", ""),
-        "candidate_location": contact.get("location", "Hamburg, Germany"),
-        "candidate_linkedin": contact.get("linkedin", ""),
-        "candidate_portfolio": contact.get("portfolio", ""),
-        "years_experience": str(contact.get("years_experience", "")),
-        "available_hours_per_week": str(profile.get("max_hours_per_week", "")),
-        "target_rate_eur_hr": str(profile.get("target_rate_floor_eur_hr", "")),
-        "target_rate_usd_hr": str(profile.get("target_rate_floor_usd_hr", "")),
-        "work_authorization": contact.get("work_authorization", ""),
-        "sensitive_defaults": sens_lines,
+        "candidate_name": str(profile_row.get("full_name", "")),
+        "candidate_email": str(profile_row.get("email", "")),
+        "candidate_phone": str(profile_row.get("phone", "")),
+        "candidate_location": str(profile_row.get("location", "")),
+        "candidate_linkedin": str(profile_row.get("linkedin_url", "")),
+        "candidate_portfolio": "",
+        "years_experience": str(profile_row.get("years_experience") or ""),
+        "available_hours_per_week": "",
+        "target_rate_eur_hr": "" if rate_eur is None else str(rate_eur),
+        "target_rate_usd_hr": "",
+        "work_authorization": "",
+        "sensitive_defaults": "  (none configured)",
         "candidate_languages": lang_lines,
     }
 
@@ -242,8 +255,13 @@ def _ask_llm_for_actions(
     listing_description: str,
 ) -> list[dict[str, Any]]:
     """Raises LLMJSONError on malformed output."""
-    profile = load_profile()
-    ctx = _candidate_context(profile)
+    from jobscout.db import get_profile
+
+    linkedin_url = os.environ["JOBSCOUT_PROFILE_LINKEDIN_URL"]
+    profile_row = get_profile(linkedin_url)
+    if profile_row is None:
+        raise RuntimeError(f"no profiles row for {linkedin_url!r}")
+    ctx = _candidate_context(profile_row)
     template = _PROMPT_PATH.read_text(encoding="utf-8")
     rendered = (
         template.replace("{{numbered_fields}}", _render_field_list(fields))
@@ -254,9 +272,8 @@ def _ask_llm_for_actions(
     )
     for k, v in ctx.items():
         rendered = rendered.replace(f"{{{{{k}}}}}", v)
-    model = profile["model_draft"]
     result = call_json(
-        model=model,
+        model="gemini-3.1-flash-lite",
         system="You fill out job-application forms conservatively and concisely.",
         user=rendered,
         max_tokens=4000,
@@ -471,12 +488,12 @@ def apply(
     listing_description: str,
     adapted_cv_md: str,
 ) -> None:
-    cdp_url = os.environ.get("UPWORK_CDP_URL")
+    cdp_url = os.environ.get("JOBSCOUT_CDP_URL")
     if not cdp_url:
         print(
-            "UPWORK_CDP_URL not set. Launch the CDP Chrome first:\n"
+            "JOBSCOUT_CDP_URL not set. Launch the CDP Chrome first:\n"
             "    bash scripts/chrome-cdp.sh\n"
-            "then re-run with UPWORK_CDP_URL=http://localhost:9222",
+            "then re-run with JOBSCOUT_CDP_URL=http://localhost:9222",
             flush=True,
         )
         sys.exit(2)
@@ -508,6 +525,8 @@ def _run(
 
         page = _walk_to_form(context, page)
         print(f"Form page: {page.url}", flush=True)
+
+        _assert_not_easy_apply(page)
 
         if _dismiss_consent_banner(page):
             print("  dismissed consent banner", flush=True)

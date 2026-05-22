@@ -16,10 +16,10 @@ set -euo pipefail
 
 PORT="${PORT:-9222}"
 PROFILE_DIR="${PROFILE_DIR:-$HOME/.cache/jobscout/chrome-cdp}"
-CHROME_BIN="${CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+JOBSCOUT_CHROME_BIN="${JOBSCOUT_CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
-if [[ ! -x "$CHROME_BIN" ]]; then
-  echo "Chrome not found at $CHROME_BIN — set CHROME_BIN to your install path" >&2
+if [[ ! -x "$JOBSCOUT_CHROME_BIN" ]]; then
+  echo "Chrome not found at $JOBSCOUT_CHROME_BIN — set JOBSCOUT_CHROME_BIN to your install path" >&2
   exit 1
 fi
 
@@ -31,7 +31,7 @@ echo "Run bootstrap from another terminal with:"
 echo "  make bootstrap-profile LINKEDIN_URL=https://www.linkedin.com/in/<the-user>/"
 echo ""
 
-exec "$CHROME_BIN" \
+exec "$JOBSCOUT_CHROME_BIN" \
   --remote-debugging-port="$PORT" \
   --user-data-dir="$PROFILE_DIR" \
   --no-first-run \
