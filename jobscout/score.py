@@ -66,7 +66,7 @@ def main() -> None:
                 model=_MODEL_SCORE,
                 system="You output JSON only.",
                 user=_build_score_prompt(profile, listing.model_dump(mode="json")),
-                max_tokens=400,
+                max_tokens=2000,
             )
             update_listing_status(
                 listing_id,
