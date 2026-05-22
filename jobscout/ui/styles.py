@@ -9,6 +9,45 @@ import streamlit as st
 
 _CSS = """
 <style>
+  /* Tab labels — Streamlit defaults render them small and muted */
+  div[data-baseweb="tab-list"] button[role="tab"] p {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+  }
+
+  /* Filter bar — sibling marker + :has() pattern, same as chips */
+  .jobscout-filter-marker { display: none; }
+
+  /* Gap between KPI hero and filter chip row */
+  div[data-testid="stHorizontalBlock"]:has(.jobscout-filter-marker) {
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  /* Inactive filter chips — light gray, subtle border */
+  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button {
+    background: white !important;
+    color: #374151 !important;
+    border: 1px solid #e5e7eb !important;
+    font-weight: 500 !important;
+  }
+  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button:hover {
+    background: #f9fafb !important;
+    border-color: #d1d5db !important;
+    color: #1f2937 !important;
+  }
+
+  /* Active (primary) filter chip — soft blue, not jet black */
+  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button[kind="primary"] {
+    background: #eff6ff !important;
+    color: #1e40af !important;
+    border: 1px solid #93c5fd !important;
+  }
+  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button[kind="primary"]:hover {
+    background: #dbeafe !important;
+    border-color: #60a5fa !important;
+  }
+
   /* Score pill — colour by threshold class */
   .jobscout-score { display:inline-block; padding:4px 10px; border-radius:14px; font-size:13px; font-weight:600; color:white; }
   .jobscout-score-high { background:#16a34a; }

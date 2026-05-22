@@ -73,6 +73,10 @@ def render_filter_bar() -> None:
         chip_cols = st.columns(len(_FILTERS))
         for i, (key, label) in enumerate(_FILTERS):
             with chip_cols[i]:
+                st.markdown(
+                    '<span class="jobscout-filter-marker"></span>',
+                    unsafe_allow_html=True,
+                )
                 count = count_pipeline_listings(filter_kind=key)
                 active = st.session_state["filter_kind"] == key
                 btn_label = f"{label} {count}"
