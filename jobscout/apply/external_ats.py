@@ -25,7 +25,6 @@ from urllib.parse import urlparse
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
-from jobscout.config_loader import load_profile
 from jobscout.llm import LLMJSONError, call_json
 
 _PAGE_THINK_SECONDS = (10.0, 18.0)
@@ -202,33 +201,28 @@ def _render_field_list(fields: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _candidate_context(profile: dict[str, Any]) -> dict[str, str]:
-    contact = profile.get("candidate_contact") or {}
-    sensitive = profile.get("sensitive_field_defaults") or {}
-    languages = profile.get("candidate_languages") or {}
-    sens_lines = (
-        "\n".join(f"  - {k}: {v}" for k, v in sensitive.items())
-        if sensitive
-        else "  (none configured)"
-    )
+def _candidate_context(profile_row: dict[str, Any]) -> dict[str, str]:
+    """Map a jobscout `profiles` row to the placeholder dict the prompt template expects."""
+    languages = profile_row.get("languages") or {}
     lang_lines = (
         "\n".join(f"  - {lang}: {level}" for lang, level in languages.items())
         if languages
         else "  (none configured)"
     )
+    rate_eur = profile_row.get("target_rate_floor_eur")
     return {
-        "candidate_name": str(profile.get("name", "")),
-        "candidate_email": contact.get("email", ""),
-        "candidate_phone": contact.get("phone", ""),
-        "candidate_location": contact.get("location", "Hamburg, Germany"),
-        "candidate_linkedin": contact.get("linkedin", ""),
-        "candidate_portfolio": contact.get("portfolio", ""),
-        "years_experience": str(contact.get("years_experience", "")),
-        "available_hours_per_week": str(profile.get("max_hours_per_week", "")),
-        "target_rate_eur_hr": str(profile.get("target_rate_floor_eur_hr", "")),
-        "target_rate_usd_hr": str(profile.get("target_rate_floor_usd_hr", "")),
-        "work_authorization": contact.get("work_authorization", ""),
-        "sensitive_defaults": sens_lines,
+        "candidate_name": str(profile_row.get("full_name", "")),
+        "candidate_email": str(profile_row.get("email", "")),
+        "candidate_phone": str(profile_row.get("phone", "")),
+        "candidate_location": str(profile_row.get("location", "")),
+        "candidate_linkedin": str(profile_row.get("linkedin_url", "")),
+        "candidate_portfolio": "",
+        "years_experience": str(profile_row.get("years_experience") or ""),
+        "available_hours_per_week": "",
+        "target_rate_eur_hr": "" if rate_eur is None else str(rate_eur),
+        "target_rate_usd_hr": "",
+        "work_authorization": "",
+        "sensitive_defaults": "  (none configured)",
         "candidate_languages": lang_lines,
     }
 
@@ -242,8 +236,13 @@ def _ask_llm_for_actions(
     listing_description: str,
 ) -> list[dict[str, Any]]:
     """Raises LLMJSONError on malformed output."""
-    profile = load_profile()
-    ctx = _candidate_context(profile)
+    from jobscout.db import get_profile
+
+    linkedin_url = os.environ["JOBSCOUT_PROFILE_LINKEDIN_URL"]
+    profile_row = get_profile(linkedin_url)
+    if profile_row is None:
+        raise RuntimeError(f"no profiles row for {linkedin_url!r}")
+    ctx = _candidate_context(profile_row)
     template = _PROMPT_PATH.read_text(encoding="utf-8")
     rendered = (
         template.replace("{{numbered_fields}}", _render_field_list(fields))
@@ -254,9 +253,8 @@ def _ask_llm_for_actions(
     )
     for k, v in ctx.items():
         rendered = rendered.replace(f"{{{{{k}}}}}", v)
-    model = profile["model_draft"]
     result = call_json(
-        model=model,
+        model="gemini-3.1-flash-lite",
         system="You fill out job-application forms conservatively and concisely.",
         user=rendered,
         max_tokens=4000,
