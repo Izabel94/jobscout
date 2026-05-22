@@ -87,3 +87,55 @@ The Pipeline tab shows KPI hero + filter chips + paginated listing cards (cards 
 - Phase 4: Apply pipeline — external_ats.py + worker.py port, page.pdf() CV render, macOS launchd plist for dev. Separate plan.
 - Phase 5: Windows installer (Briefcase MSI), Task Scheduler, post/pre-install scripts. Separate plan.
 - Phase 6: Operator handover. Separate plan.
+
+## Apply pipeline (Mac dev)
+
+The apply worker runs locally on the operator's Mac via macOS launchd. It claims one
+`apply_requests` row at a time, renders the candidate's adapted CV to PDF in the CDP-attached
+Chrome via `page.pdf()`, attaches via Playwright `connect_over_cdp`, walks Apply CTAs, and
+pauses at the final Submit button for the operator to review and click. External-ATS only —
+LinkedIn Easy Apply is never auto-applied; those rows surface in the dashboard for manual
+one-click apply.
+
+### Environment
+
+Set these in `.env` (or the operator's shell):
+
+```bash
+JOBSCOUT_CDP_URL=http://localhost:9222
+JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/<the-end-user>/
+JOBSCOUT_CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome   # optional, defaults to this
+```
+
+### Daily workflow
+
+1. Once a day, launch the CDP Chrome window (and sign into LinkedIn if you haven't already):
+
+   ```bash
+   bash scripts/chrome-cdp.sh
+   ```
+
+2. Open the Streamlit dashboard, click Apply on listings you want.
+
+3. The launchd worker runs every 5 minutes, claims pending rows, fills the form, then pauses on the Submit step. Review what got filled and click Submit yourself.
+
+### launchd install
+
+```bash
+cp scripts/com.jobscout.apply-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.jobscout.apply-worker.plist
+launchctl list | grep jobscout
+```
+
+### Daily cap
+
+Hard 10/day total across all sources (counted from `submissions` table since 00:00 UTC). Pipeline KPI hero shows "X/10 applied today". Cap is enforced per worker-loop iteration so a backlog of pending rows produces only as many submissions as remain under the cap.
+
+### Smoke test against a public ATS sandbox
+
+```bash
+bash scripts/chrome-cdp.sh                                    # window 1
+poetry run python scripts/smoke_external_ats.py               # window 2
+```
+
+Requires a sample CV PDF at `/tmp/jobscout-smoke-cv.pdf`. Inspect the filled fields manually, then close the tab — do NOT submit on a sandbox listing.

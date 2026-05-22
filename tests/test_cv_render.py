@@ -1,7 +1,4 @@
-from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 from jobscout.cv_render import cv_markdown_to_pdf
 
@@ -11,7 +8,7 @@ def test_cv_markdown_to_pdf_calls_set_content_and_pdf(tmp_path):
     out = tmp_path / "cv.pdf"
 
     result = cv_markdown_to_pdf(
-        "# Julian Engelke\n\nHamburg\n\n### Mediaplus | Hamburg\n**Senior Consultant** | *2023–now*",
+        "# Julian Engelke\n\nHamburg\n\n### Mediaplus | Hamburg\n**Senior Consultant** | *2023-now*",
         out,
         page=page,
     )
