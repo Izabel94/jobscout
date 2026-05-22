@@ -8,8 +8,9 @@ Prereqs:
 Then in window 2:
   poetry run python scripts/smoke_external_ats.py
 
-Pick a public Greenhouse demo job (e.g. boards.greenhouse.io/embed/job_app?token=...).
-Inspect the filled fields manually, then CLOSE the tab — do not submit.
+Smoke target is a real public Greenhouse application form (verified live
+2026-05-22 via Playwright MCP). Inspect the filled fields manually, then
+CLOSE the tab — do not submit.
 """
 
 from __future__ import annotations
@@ -19,7 +20,10 @@ from pathlib import Path
 
 from jobscout.apply import external_ats
 
-DEMO_ATS_URL = "https://boards.greenhouse.io/greenhouse/jobs/4030001005"  # public demo
+# Greenhouse's own public application for Forward Deployed Engineer (Ontario).
+# Has ~20 fields covering text/email/select/file/textarea/checkbox — a thorough
+# enumeration test. The role location (Ontario) is irrelevant for smoke purposes.
+DEMO_ATS_URL = "https://job-boards.greenhouse.io/greenhouse/jobs/7891787?gh_jid=7891787"
 PROPOSAL = "Hi — this is a smoke test of the jobscout apply pipeline. Please disregard."
 
 
