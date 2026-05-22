@@ -18,6 +18,7 @@ from typing import Any
 
 from jobscout.db import (
     claim_one_pending_apply_request,
+    count_submissions_today_external,
     get_latest_draft_for_listing,
     get_listing_by_id,
     mark_apply_request_done,
@@ -135,6 +136,9 @@ def process_one(row: dict[str, Any]) -> None:
         mark_apply_request_failed(request_id, error=str(e), notes=None)
 
 
+_DAILY_CAP = 10
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     recovered = recover_stale_apply_claims()
@@ -142,10 +146,17 @@ def main() -> int:
         log.info("recovered %d stale claim(s)", recovered)
     processed = 0
     while True:
+        already_today = count_submissions_today_external()
+        if already_today >= _DAILY_CAP:
+            log.info("daily cap reached (%d/%d) — exiting", already_today, _DAILY_CAP)
+            break
         row = claim_one_pending_apply_request()
         if row is None:
             break
-        log.info("processing apply_request %s (source=%s)", row["id"], row["source"])
+        log.info(
+            "processing apply_request %s (source=%s, %d/%d applied today)",
+            row["id"], row["source"], already_today, _DAILY_CAP,
+        )
         process_one(row)
         processed += 1
     log.info("worker done — processed %d request(s)", processed)

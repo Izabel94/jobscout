@@ -135,3 +135,51 @@ def test_process_one_flips_apply_method_on_easy_apply_after_click(monkeypatch):
 
     assert flips == ["l1"]
     assert failed == [("r1", "easy_apply_detected_at_click")]
+
+
+def test_main_loop_stops_at_daily_cap(monkeypatch):
+    from jobscout.apply import worker
+
+    submissions_count = [8]
+    monkeypatch.setattr(worker, "count_submissions_today_external", lambda: submissions_count[0])
+    monkeypatch.setattr(worker, "recover_stale_apply_claims", lambda: 0)
+
+    pending_rows = [
+        {"id": "r1", "listing_id": "l1", "source": "linkedin"},
+        {"id": "r2", "listing_id": "l2", "source": "linkedin"},
+        {"id": "r3", "listing_id": "l3", "source": "linkedin"},
+    ]
+    claims: list[str] = []
+
+    def _claim():
+        if pending_rows:
+            row = pending_rows.pop(0)
+            claims.append(row["id"])
+            return row
+        return None
+    monkeypatch.setattr(worker, "claim_one_pending_apply_request", _claim)
+
+    def _process(_row):
+        submissions_count[0] += 1  # simulate a successful submission
+    monkeypatch.setattr(worker, "process_one", _process)
+
+    worker.main()
+
+    # Should stop after 2 (8 → 9 → 10), leaving r3 pending. The 3rd claim happens
+    # but we re-check cap immediately and stop without processing.
+    assert claims == ["r1", "r2"]
+
+
+def test_main_loop_skips_if_already_capped(monkeypatch):
+    from jobscout.apply import worker
+
+    monkeypatch.setattr(worker, "count_submissions_today_external", lambda: 10)
+    monkeypatch.setattr(worker, "recover_stale_apply_claims", lambda: 0)
+    claims: list[str] = []
+    monkeypatch.setattr(worker, "claim_one_pending_apply_request",
+                        lambda: claims.append("called") or None)
+    monkeypatch.setattr(worker, "process_one", lambda _: None)
+
+    worker.main()
+
+    assert claims == []  # never even attempted a claim
