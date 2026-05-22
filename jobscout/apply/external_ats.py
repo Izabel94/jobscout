@@ -7,7 +7,7 @@ to the Submit step; the user clicks Submit.
 Flow: attach to CDP Chrome → walk apply-CTA hops → enumerate fields →
 one LLM call to map fields to actions → apply each action → pause.
 
-We reuse the `UPWORK_CDP_URL` env var — same CDP Chrome instance for all
+We reuse the `JOBSCOUT_CDP_URL` env var — same CDP Chrome instance for all
 auto-apply flows.
 """
 
@@ -471,12 +471,12 @@ def apply(
     listing_description: str,
     adapted_cv_md: str,
 ) -> None:
-    cdp_url = os.environ.get("UPWORK_CDP_URL")
+    cdp_url = os.environ.get("JOBSCOUT_CDP_URL")
     if not cdp_url:
         print(
-            "UPWORK_CDP_URL not set. Launch the CDP Chrome first:\n"
+            "JOBSCOUT_CDP_URL not set. Launch the CDP Chrome first:\n"
             "    bash scripts/chrome-cdp.sh\n"
-            "then re-run with UPWORK_CDP_URL=http://localhost:9222",
+            "then re-run with JOBSCOUT_CDP_URL=http://localhost:9222",
             flush=True,
         )
         sys.exit(2)
