@@ -23,8 +23,6 @@ try {
     $toast = New-Object Windows.UI.Notifications.ToastNotification($doc)
     [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("jobscout").Show($toast)
 } catch {
-    # Toast API unavailable (e.g. running under SYSTEM context). Fall back to
-    # appending to the jobscout log so failures aren't completely silent.
     $logDir = Join-Path $env:LOCALAPPDATA "jobscout\logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
     $line = "{0} [notify-fallback] {1} — {2}" -f (Get-Date -Format "yyyy-MM-ddTHH:mm:ss"), $Title, $Body

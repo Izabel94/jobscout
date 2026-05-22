@@ -19,6 +19,8 @@ if "%JOBSCOUT_CHROME_BIN%"=="" (
         set "JOBSCOUT_CHROME_BIN=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
     ) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
         set "JOBSCOUT_CHROME_BIN=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+    ) else if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+        set "JOBSCOUT_CHROME_BIN=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
     ) else if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
         set "JOBSCOUT_CHROME_BIN=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
     ) else (
