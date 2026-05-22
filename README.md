@@ -139,3 +139,14 @@ poetry run python scripts/smoke_external_ats.py               # window 2
 ```
 
 Requires a sample CV PDF at `/tmp/jobscout-smoke-cv.pdf`. Inspect the filled fields manually, then close the tab — do NOT submit on a sandbox listing.
+
+## Apply pipeline (Windows runtime)
+
+The end-user runs jobscout on Windows. The Task Scheduler firmware mirrors
+the Mac launchd setup — `apply-worker.bat` runs every 5 min, `discover.bat`
+runs daily at 10:30 local time.
+
+See [`scripts/win/README.md`](scripts/win/README.md) for the operator install
+runbook (clone → `poetry install` → `schtasks /Create /XML`).
+
+Briefcase MSI installer is deferred to Phase 5b.
