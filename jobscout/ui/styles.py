@@ -15,38 +15,6 @@ _CSS = """
     font-weight: 500 !important;
   }
 
-  /* Filter bar — sibling marker + :has() pattern, same as chips */
-  .jobscout-filter-marker { display: none; }
-
-  /* Gap between KPI hero and filter chip row */
-  div[data-testid="stHorizontalBlock"]:has(.jobscout-filter-marker) {
-    margin-top: 16px;
-    margin-bottom: 8px;
-  }
-
-  /* Inactive filter chips — light gray, subtle border */
-  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button {
-    background: white !important;
-    color: #374151 !important;
-    border: 1px solid #e5e7eb !important;
-    font-weight: 500 !important;
-  }
-  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button:hover {
-    background: #f9fafb !important;
-    border-color: #d1d5db !important;
-    color: #1f2937 !important;
-  }
-
-  /* Active (primary) filter chip — soft blue, not jet black */
-  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button[kind="primary"] {
-    background: #eff6ff !important;
-    color: #1e40af !important;
-    border: 1px solid #93c5fd !important;
-  }
-  div[data-testid="stColumn"]:has(.jobscout-filter-marker) [data-testid="stButton"] > button[kind="primary"]:hover {
-    background: #dbeafe !important;
-    border-color: #60a5fa !important;
-  }
 
   /* Score pill — colour by threshold class */
   .jobscout-score { display:inline-block; padding:4px 10px; border-radius:14px; font-size:13px; font-weight:600; color:white; }
@@ -109,7 +77,7 @@ _CSS = """
     background:#fafafa; border:1px dashed #ddd; border-radius:12px;
     padding:32px; text-align:center; color:#666;
   }
-  .jobscout-empty-callout.compact { padding:24px; }
+  .jobscout-empty-callout.compact { padding:24px; margin-bottom:14px; }
   .jobscout-empty-title {
     font-size:16px; font-weight:600; color:#1f2937; margin-bottom:8px;
   }

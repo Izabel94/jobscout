@@ -59,8 +59,9 @@ _FILTERS = [
 _SORTS = {"first_seen": "First seen (newest)", "score": "Score (highest)"}
 
 
-def render_filter_bar() -> None:
-    """Render filter chips + sort. Writes selected filter/sort into session_state."""
+def render_sidebar_filters() -> None:
+    """Sidebar filters (sidegig pattern). Writes filter_kind + sort_by into
+    session_state. Replaces the old chip-row layout that had alignment issues."""
     if "filter_kind" not in st.session_state:
         st.session_state["filter_kind"] = "all"
     if "sort_by" not in st.session_state:
@@ -68,40 +69,39 @@ def render_filter_bar() -> None:
     if "page" not in st.session_state:
         st.session_state["page"] = 0
 
-    cols = st.columns([6, 2])
-    with cols[0]:
-        chip_cols = st.columns(len(_FILTERS))
-        for i, (key, label) in enumerate(_FILTERS):
-            with chip_cols[i]:
-                st.markdown(
-                    '<span class="jobscout-filter-marker"></span>',
-                    unsafe_allow_html=True,
-                )
-                count = count_pipeline_listings(filter_kind=key)
-                active = st.session_state["filter_kind"] == key
-                btn_label = f"{label} {count}"
-                if st.button(
-                    btn_label,
-                    key=f"chip-{key}",
-                    type="primary" if active else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["filter_kind"] = key
-                    st.session_state["page"] = 0
-                    st.rerun()
-    with cols[1]:
+    with st.sidebar:
+        st.markdown("### Pipeline filters")
+
+        # Compute counts so labels show how many listings each filter would surface.
+        counts = {key: count_pipeline_listings(filter_kind=key) for key, _ in _FILTERS}
+
+        new_filter = st.radio(
+            "Show",
+            options=[key for key, _ in _FILTERS],
+            format_func=lambda k: f"{dict(_FILTERS)[k]} ({counts[k]})",
+            index=[key for key, _ in _FILTERS].index(st.session_state["filter_kind"]),
+            key="filter-radio",
+        )
+        if new_filter != st.session_state["filter_kind"]:
+            st.session_state["filter_kind"] = new_filter
+            st.session_state["page"] = 0
+            st.rerun()
+
         new_sort = st.selectbox(
             "Sort by",
             options=list(_SORTS.keys()),
             format_func=lambda k: _SORTS[k],
             index=list(_SORTS.keys()).index(st.session_state["sort_by"]),
             key="sort-select",
-            label_visibility="collapsed",
         )
         if new_sort != st.session_state["sort_by"]:
             st.session_state["sort_by"] = new_sort
             st.session_state["page"] = 0
             st.rerun()
+
+
+# Back-compat shim — app.py calls render_filter_bar()
+render_filter_bar = render_sidebar_filters
 
 
 def render_listing_list() -> None:
@@ -143,17 +143,8 @@ def render_listing_list() -> None:
 def render_empty_state() -> None:
     fk = st.session_state.get("filter_kind", "all")
     if fk != "all":
-        # Filter excludes everything — show clear-filter affordance
-        st.markdown(
-            '<div class="jobscout-empty-callout compact">'
-            '<div>No matches for this filter.</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Clear filter", key="clear-filter"):
-            st.session_state["filter_kind"] = "all"
-            st.session_state["page"] = 0
-            st.rerun()
+        # Filter excludes everything — sidebar radio is the way to clear it.
+        st.info("No listings match the current filter. Adjust the sidebar to see more.")
         return
 
     # No listings at all — friendly copy + last-run summary if available
