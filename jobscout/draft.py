@@ -1,12 +1,15 @@
 """Generates a tailored cover letter and adapted CV for one Listing."""
 
+import logging
 import re
 from pathlib import Path
 
 from jobscout.config_loader import load_cv_markdown, load_profile, render_candidate_block
-from jobscout.db import update_listing_status, write_draft
+from jobscout.db import list_by_status, update_listing_status, write_draft
 from jobscout.llm import call_text
 from jobscout.models import Draft, Listing, ListingStatus
+
+log = logging.getLogger("draft")
 
 _MODEL_DRAFT = "gemini-3.1-flash-lite"  # spec §10 decision
 _PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
@@ -102,3 +105,24 @@ def draft_one(listing: Listing) -> Draft:
     write_draft(draft)
     update_listing_status(listing.id, ListingStatus.DRAFTED)
     return draft
+
+
+def main() -> None:
+    """Draft every scored listing that doesn't yet have a draft.
+
+    Driven by the daily cron after score.py. Cron order is
+    discover → filter → score → draft.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    rows = list_by_status(ListingStatus.SCORED)
+    log.info("drafting %d scored listings with %s", len(rows), _MODEL_DRAFT)
+    for row in rows:
+        listing_id = str(row["id"])
+        try:
+            draft_one(Listing.model_validate(row))
+        except Exception as exc:  # noqa: BLE001 — survive the loop
+            log.error("draft failed for %s: %s", listing_id, exc)
+
+
+if __name__ == "__main__":
+    main()

@@ -14,6 +14,7 @@ import streamlit as st
 
 from jobscout.db import (
     get_latest_draft_for_listing,
+    insert_apply_request,
     mark_listing_viewed,
     update_listing_status,
 )
@@ -209,7 +210,16 @@ def render(listing: dict[str, Any]) -> None:
             with col_right:
                 if am == ApplyMethod.EXTERNAL_APPLY:
                     if st.button("Apply", key=f"apply-{listing.get('id', '')}", type="primary"):
-                        st.toast("Apply pipeline runs in Phase 4 — for now copy + open the listing.", icon="ℹ️")
+                        if listing.get("id"):
+                            insert_apply_request(
+                                listing_id=listing["id"],
+                                source=listing.get("source") or "",
+                            )
+                            st.toast(
+                                "Apply queued — the worker will pick it up within 5 minutes.",
+                                icon="✓",
+                            )
+                            st.rerun()
                 else:
                     st.link_button(
                         "Open in LinkedIn ↗",
