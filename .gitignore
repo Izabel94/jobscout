@@ -45,3 +45,4 @@ config/profile_photo.*
 # Personal CV files — kept locally only, mirrored into Streamlit Cloud secrets (CV_BASE_EN, CV_BASE_DE)
 config/cv_base_en.md
 config/cv_base_de.md
+.superpowers/
