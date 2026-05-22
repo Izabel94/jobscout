@@ -58,6 +58,7 @@ _CSS = """
   /* KPI hero tiles */
   .jobscout-kpi-tile {
     background:white; border:1px solid #eee; border-radius:10px; padding:14px;
+    margin-bottom:18px;
   }
   .jobscout-kpi-label {
     color:#666; font-size:11px; letter-spacing:0.05em; text-transform:uppercase;
