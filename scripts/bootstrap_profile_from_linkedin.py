@@ -1,26 +1,31 @@
 """One-shot script: scrape an end user's LinkedIn profile and upsert the
 structured result to Supabase's profiles row.
 
-Operator runs this once per new end user. First run prompts for LinkedIn
-login in a visible Chromium window; subsequent runs reuse the session.
+Attaches via CDP to a Chrome the operator already launched via
+`bash scripts/chrome-cdp.sh` and signed into LinkedIn in. Google's anti-
+automation rejects Playwright-launched browsers; attaching to a real,
+user-launched Chrome with an existing session avoids that entirely.
 
 Usage:
-    poetry run dotenv run -- python scripts/bootstrap_profile_from_linkedin.py \\
-        https://www.linkedin.com/in/<the-user>/
+    bash scripts/chrome-cdp.sh       # in one terminal, sign into LinkedIn
+    make bootstrap-profile LINKEDIN_URL=https://www.linkedin.com/in/<the-user>/
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
-from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from jobscout.db import upsert_profile
-from jobscout.llm import call_json
+import json
+import re
 
-PROFILE_DIR = Path.home() / ".cache" / "jobscout" / "linkedin-profile"
+from jobscout.db import upsert_profile
+from jobscout.llm import call_text
+
+CDP_URL = os.environ.get("JOBSCOUT_CDP_URL", "http://localhost:9222")
 
 EXTRACT_PROMPT = """Below is the visible text of a LinkedIn profile page.
 Extract the candidate's information as JSON matching this schema. Return
@@ -49,24 +54,49 @@ Profile text:
 """
 
 
+def _parse_lenient_json(raw: str) -> dict:
+    s = raw.strip()
+    if s.startswith("```"):
+        s = s.split("```")[1]
+        if s.startswith("json"):
+            s = s[4:]
+    s = s.strip()
+    # Strip trailing commas before `}` or `]` — the most common Gemini glitch.
+    s = re.sub(r",(\s*[}\]])", r"\1", s)
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+    # If the output was truncated mid-object, find the last balanced `}` and try.
+    last_close = s.rfind("}")
+    if last_close > 0:
+        candidate = s[: last_close + 1]
+        candidate = re.sub(r",(\s*[}\]])", r"\1", candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+    raise RuntimeError(f"Could not parse LLM JSON. Raw:\n{raw[:2000]}")
+
+
 def _scrape_text(linkedin_url: str) -> str:
-    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(
-            user_data_dir=str(PROFILE_DIR),
-            headless=False,
-            viewport={"width": 1280, "height": 900},
-        )
-        page = context.pages[0] if context.pages else context.new_page()
-        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30_000)
-        if "/login" in page.url or "/checkpoint" in page.url:
-            print("Operator: log in to LinkedIn in the opened window, then press Enter here.", flush=True)
-            input()
-        page.goto(linkedin_url, wait_until="domcontentloaded", timeout=30_000)
-        page.wait_for_timeout(3_000)
-        text = page.evaluate("() => document.body.innerText")
-        context.close()
-        return str(text)
+        browser = p.chromium.connect_over_cdp(CDP_URL)
+        context = browser.contexts[0] if browser.contexts else browser.new_context()
+        page = context.new_page()
+        try:
+            page.goto(linkedin_url, wait_until="domcontentloaded", timeout=30_000)
+            page.wait_for_timeout(3_000)
+            if "/login" in page.url or "/checkpoint" in page.url or "authwall" in page.url:
+                raise RuntimeError(
+                    f"Hit LinkedIn authwall at {page.url!r}. "
+                    "Sign into LinkedIn in the chrome-cdp.sh Chrome window and re-run."
+                )
+            text = page.evaluate("() => document.body.innerText")
+            return str(text)
+        finally:
+            page.close()
+            browser.close()
 
 
 def main() -> int:
@@ -74,15 +104,17 @@ def main() -> int:
         print(__doc__, file=sys.stderr)
         return 2
     linkedin_url = sys.argv[1].rstrip("/")
+    print(f"Connecting to CDP Chrome at {CDP_URL} ...", flush=True)
     print(f"Scraping {linkedin_url} ...", flush=True)
     text = _scrape_text(linkedin_url)
     print(f"Got {len(text)} chars; extracting via LLM ...", flush=True)
-    extracted = call_json(
+    raw = call_text(
         model="gemini-2.5-flash",
-        system="You extract structured candidate data from LinkedIn profile text.",
+        system="You extract structured candidate data from LinkedIn profile text. Return ONLY valid JSON, no markdown fences, no trailing commas.",
         user=EXTRACT_PROMPT.replace("{{page_text}}", text[:25_000]),
-        max_tokens=4000,
+        max_tokens=8000,
     )
+    extracted = _parse_lenient_json(raw)
     print("LLM result (truncated):")
     print(json.dumps(extracted, indent=2, ensure_ascii=False)[:800])
     if not extracted.get("full_name"):
