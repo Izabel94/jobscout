@@ -15,6 +15,7 @@ from jobspy import scrape_jobs
 
 from jobscout.derive import classify_apply_method, classify_arrangement, classify_job_type
 from jobscout.models import Listing, RateUnit, Source
+from jobscout.sources._description import html_to_markdown
 from jobscout.sources.base import BRAND_UA, CadenceRule, SourceAdapter
 
 _JSON_SAFE_TYPES = (str, int, float, bool, list, dict, type(None))
@@ -60,10 +61,11 @@ class IndeedSource(SourceAdapter):
                 country_indeed=self.country,
                 results_wanted=self.policy.max_results_per_run or 15,
                 hours_old=72,
+                description_format="html",
             )
             for _, row in df.iterrows():
                 d: dict[str, Any] = row.to_dict()
-                description = str(d.get("description") or "")
+                description = html_to_markdown(d.get("description"))
                 arrangement, arr_ev = classify_arrangement(d)
                 job_type_classified, jt_ev = classify_job_type(d)
                 apply_method, _am_ev = classify_apply_method("indeed", d)
