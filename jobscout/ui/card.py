@@ -179,12 +179,8 @@ def render(listing: dict[str, Any]) -> None:
 
             desc = listing.get("description") or ""
             if desc:
-                truncated = desc[:500] + ("…" if len(desc) > 500 else "")
                 st.markdown("**Listing description**")
-                st.markdown(truncated)
-                if len(desc) > 500:
-                    with st.expander("Read full description"):
-                        st.markdown(desc)
+                st.markdown(desc)
 
             draft = get_latest_draft_for_listing(listing["id"]) if listing.get("id") else None
             if draft:
