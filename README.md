@@ -60,6 +60,26 @@ make lint    # ruff check + format-check
 make type    # mypy strict
 ```
 
+## Streamlit Cloud deploy (Phase 3 UI)
+
+1. Push the repo to GitHub (private, gitignored .env stays out).
+2. In Streamlit Cloud → New app → point at `jobscout/ui/app.py` on the main branch.
+3. Set these app secrets in Streamlit Cloud's dashboard:
+   - `JOBSCOUT_DEPLOYED=1`
+   - `JOBSCOUT_PASSWORD=<end-user-password>`
+   - `JOBSCOUT_PROFILE_LINKEDIN_URL=<the end user's linkedin url>`
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY` — same values as `.env`.
+4. Streamlit Cloud reads `requirements.txt` (not pyproject.toml) — keep both in sync when adding deps.
+5. After deploy, the app shows the password gate. Sign in with `JOBSCOUT_PASSWORD`. Tabs are Pipeline + Settings.
+
+## UI development
+
+```
+make ui     # launch Streamlit locally at http://localhost:8501
+```
+
+The Pipeline tab shows KPI hero + filter chips + paginated listing cards (cards have a green left-border accent for viewed listings — auto-marked on expand, per sidegig commit 559c15c). The Settings tab edits the profile row directly via DB upsert.
+
 ## Project status
 
 - Phase 0–2 (this codebase): data backbone — sources, derived classifiers, schema, profile bootstrap, scoring + drafting pipeline. Complete.

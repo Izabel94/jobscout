@@ -40,7 +40,7 @@ def auth_gate() -> None:
     # 1Password autofill workaround — Streamlit emits autocomplete=new-password
     # with no username field, so password managers refuse to autofill.
     # Override autocomplete + inject hidden username (web.dev's documented
-    # pattern for password-only logins). See sidegig commits 7cef991 + fdd7e7d.
+    # pattern for password-only logins).
     st.html(
         """
         <script>
