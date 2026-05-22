@@ -1,16 +1,18 @@
-"""Apply-queue worker — picks up pending apply_requests rows and runs
-the matching apply module locally on the user's Mac. Invoked every 5 min
-by macOS launchd via scripts/apply-worker-local.sh.
+"""Apply-queue worker — claims pending apply_requests rows, renders the CV
+PDF in the CDP-attached Chrome, and dispatches to external_ats. EXTERNAL_APPLY
+only; LinkedIn Easy Apply is surfaced for manual click and never reaches here.
 
-Reads from cloud Supabase, dispatches to the existing per-source apply
-modules. The user still clicks Submit on the Mac — the worker only fills.
+Invoked by macOS launchd via scripts/apply-worker-local.sh every 5 min.
+Windows .bat + Task Scheduler equivalents land in Phase 5.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,7 @@ from jobscout.db import (
     get_listing_by_id,
     mark_apply_request_done,
     mark_apply_request_failed,
+    record_submission,
     recover_stale_apply_claims,
 )
 
@@ -34,30 +37,62 @@ def _fetch_latest_draft(listing_id: str) -> dict[str, Any] | None:
     return get_latest_draft_for_listing(listing_id)
 
 
+def _ats_url_for(listing: dict[str, Any]) -> str:
+    """Greenhouse / Lever / Workable / employer direct URL parsed by derive.py
+    lives in `company_url_direct`. Fall back to the listing URL if absent
+    (e.g. Indeed listings where derive marked it EXTERNAL_APPLY based on a
+    different signal)."""
+    return str(listing.get("company_url_direct") or listing["url"])
+
+
+def _open_render_tab():
+    """Open a throwaway tab on the CDP Chrome for cv_render to call page.pdf() on."""
+    from playwright.sync_api import sync_playwright as _spw
+
+    cdp_url = os.environ["JOBSCOUT_CDP_URL"]
+    p = _spw().start()
+    browser = p.chromium.connect_over_cdp(cdp_url)
+    context = browser.contexts[0] if browser.contexts else browser.new_context()
+    page = context.new_page()
+    page._jobscout_pw = p  # type: ignore[attr-defined]
+    page._jobscout_browser = browser  # type: ignore[attr-defined]
+    return page
+
+
+def _close_render_tab(page) -> None:
+    import contextlib
+
+    with contextlib.suppress(Exception):
+        page.close()
+    with contextlib.suppress(Exception):
+        page._jobscout_browser.close()  # type: ignore[attr-defined]
+    with contextlib.suppress(Exception):
+        page._jobscout_pw.stop()  # type: ignore[attr-defined]
+
+
 def _render_cv_pdf(cv_markdown: str, **_kwargs: object) -> Path:
-    """Render the adapted CV markdown to a PDF and return its path.
-
-    Filename: `izabel-cvetkovic-cv-<YYYYMMDD-HHMMSS>.pdf`. Name starts with
-    the candidate so the recipient instantly recognises the attachment;
-    UTC timestamp suffix guarantees uniqueness across queued requests.
-    """
-    from datetime import UTC, datetime
-
+    """Render the adapted CV markdown to a PDF in temp dir, return its path."""
     from jobscout.cv_render import cv_markdown_to_pdf
 
     stamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
-    out = Path(tempfile.gettempdir()) / f"izabel-cvetkovic-cv-{stamp}.pdf"
-    cv_markdown_to_pdf(cv_markdown, out)
+    out = Path(tempfile.gettempdir()) / f"jobscout-cv-{stamp}.pdf"
+    page = _open_render_tab()
+    try:
+        cv_markdown_to_pdf(cv_markdown, out, page=page)
+    finally:
+        _close_render_tab(page)
     return out
 
 
-def process_one(row: dict[str, Any]) -> None:
-    """Dispatch a single apply_request to the right per-source apply module.
+def _record_submission_and_mark_done(request_id: str, listing_id: str, draft_id: str) -> None:
+    record_submission(listing_id, draft_id, channel="external_apply", notes=None)
+    mark_apply_request_done(request_id, executed_draft_id=draft_id, notes=None)
 
-    All errors are caught and marked as `failed` on the row so the loop
-    survives. Stale-claim recovery handles the case where this function
-    itself crashes before marking the row done/failed.
-    """
+
+def process_one(row: dict[str, Any]) -> None:
+    """Dispatch a single apply_request. All errors are caught; the row is marked
+    failed so the worker loop survives. Stale-claim recovery handles crashes
+    that prevent us from reaching either done- or failed-mark."""
     request_id = row["id"]
     try:
         listing = _fetch_listing(row["listing_id"])
@@ -66,42 +101,20 @@ def process_one(row: dict[str, Any]) -> None:
         draft = _fetch_latest_draft(row["listing_id"])
         if draft is None:
             raise RuntimeError(f"no draft for listing {row['listing_id']}")
-        cv_pdf_path = _render_cv_pdf(
-            draft["adapted_cv"], listing_id=row["listing_id"], draft_id=draft["id"]
+
+        cv_pdf_path = _render_cv_pdf(draft["adapted_cv"])
+
+        from jobscout.apply import external_ats
+
+        external_ats.apply(
+            ats_url=_ats_url_for(listing),
+            proposal=draft["body"],
+            cv_pdf_path=cv_pdf_path,
+            listing_title=listing.get("title") or "",
+            listing_description=listing.get("description") or "",
+            adapted_cv_md=draft["adapted_cv"],
         )
-
-        source = row["source"]
-        if source == "upwork":
-            from jobscout.apply import upwork as upwork_mod
-
-            upwork_mod.apply(
-                listing["url"],
-                draft["body"],
-                cv_pdf_path,
-                listing_title=listing.get("title") or "",
-                listing_description=listing.get("description") or "",
-                adapted_cv_md=draft["adapted_cv"],
-            )
-        elif source == "freelancermap":
-            from jobscout.apply import freelancermap as fm_mod
-
-            fm_mod.apply(listing["url"], draft["body"], cv_pdf_path)
-        elif source in ("bundesagentur", "linkedin"):
-            from jobscout.apply import external_ats
-
-            ats_url = (listing.get("raw") or {}).get("externeUrl") or listing["url"]
-            external_ats.apply(
-                ats_url=ats_url,
-                proposal=draft["body"],
-                cv_pdf_path=cv_pdf_path,
-                listing_title=listing.get("title") or "",
-                listing_description=listing.get("description") or "",
-                adapted_cv_md=draft["adapted_cv"],
-            )
-        else:
-            raise RuntimeError(f"unknown source: {source!r}")
-
-        mark_apply_request_done(request_id, executed_draft_id=draft["id"], notes=None)
+        _record_submission_and_mark_done(request_id, listing["id"], draft["id"])
     except Exception as e:
         log.exception("apply request %s failed", request_id)
         mark_apply_request_failed(request_id, error=str(e), notes=None)
