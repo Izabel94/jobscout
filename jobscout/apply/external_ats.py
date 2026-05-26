@@ -222,6 +222,9 @@ def _select_round_targets(fields: list[dict[str, Any]], seen_ids: set[str]) -> l
         kind = (f.get("kind") or "").lower()
         if kind in ("checkbox", "radio"):
             continue  # already-seen checkbox state is meaningful even if "unchecked"
+        if kind == "file":
+            continue  # file inputs always report empty currentValue (browser
+            # security) — re-targeting would re-attach the same CV every round
         current = f.get("currentValue")
         if isinstance(current, str):
             current = current.strip()
