@@ -8,8 +8,8 @@ name: daily
 # Upwork is intentionally NOT in this workflow. Its Cloudflare Turnstile
 # blocks Playwright Chromium regardless of stealth, so the only path that
 # works is CDP-attaching to the user's real Chrome. That can't run on a
-# GHA runner. The macOS `launchd` job in scripts/com.sidegig.upwork-discover.plist
-# handles Upwork locally instead.
+# GHA runner. A local scheduler (launchd on macOS, Task Scheduler on
+# Windows — see scripts/win/) handles Upwork locally instead.
 
 on:
   schedule:
@@ -52,8 +52,8 @@ jobs:
         env:
           FREELANCERMAP_PROFILE_B64: ${{ secrets.FREELANCERMAP_PROFILE_B64 }}
         run: |
-          mkdir -p ~/.cache/sidegig/freelancermap-profile
-          echo "$FREELANCERMAP_PROFILE_B64" | base64 -d | tar -xzC ~/.cache/sidegig/freelancermap-profile
+          mkdir -p ~/.cache/jobscout/freelancermap-profile
+          echo "$FREELANCERMAP_PROFILE_B64" | base64 -d | tar -xzC ~/.cache/jobscout/freelancermap-profile
 
       - name: Run discover for ${{ matrix.source }}
         env:
@@ -64,7 +64,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
-        run: poetry run python -m sidegig.discover --only "$SOURCE"
+        run: poetry run python -m jobscout.discover --only "$SOURCE"
 
   freshness:
     # Sweep listings whose detail page now says "no longer accepting" /
@@ -86,7 +86,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
-        run: poetry run python -m sidegig.freshness
+        run: poetry run python -m jobscout.freshness
 
   filter:
     needs: freshness
@@ -104,7 +104,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: poetry run python -m sidegig.filter
+        run: poetry run python -m jobscout.filter
 
   score:
     needs: filter
@@ -125,7 +125,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: poetry run python -m sidegig.score
+        run: poetry run python -m jobscout.score
 
       # Print a digest of new high-scoring listings to the GHA log. No
       # email — user opted out. The digest script is still useful locally
