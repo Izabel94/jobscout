@@ -1,15 +1,17 @@
-"""Generates a tailored proposal and adapted CV for one Listing."""
+"""Generates a tailored cover letter and adapted CV for one Listing."""
 
+import logging
 import re
 from pathlib import Path
-from typing import Any
 
-from jobscout.config_loader import load_cv_markdown, load_profile
-from jobscout.db import update_listing_status, write_draft
+from jobscout.config_loader import load_cv_markdown, load_profile, render_candidate_block
+from jobscout.db import list_by_status, update_listing_status, write_draft
 from jobscout.llm import call_text
 from jobscout.models import Draft, Listing, ListingStatus
 
-_MODEL_DRAFT = "gemini-2.5-flash"  # spec decision
+log = logging.getLogger("draft")
+
+_MODEL_DRAFT = "gemini-3.1-flash-lite"  # spec §10 decision
 _PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
@@ -17,19 +19,7 @@ _PROMPT_PROP = (_PROMPTS_DIR / "draft_proposal.v1.md").read_text(encoding="utf-8
 _PROMPT_CV = (_PROMPTS_DIR / "draft_cv.v1.md").read_text(encoding="utf-8")
 
 
-def _profile_blurb(profile: dict[str, Any]) -> str:
-    skills = ", ".join((profile.get("required_skill_keywords") or [])[:10])
-    name = profile.get("full_name") or ""
-    return f"{name} — AI Engineer (Hamburg). Stack: {skills}"
-
-
-def _case_studies(profile: dict[str, Any]) -> str:
-    summaries = profile.get("anchor_summaries") or []
-    return "\n\n".join(f"- {c['title']}: {c['summary']}" for c in summaries)
-
-
 def _extract_entry_headers(cv_md: str) -> list[str]:
-    """Each `### ` header marks an employer/institution — the unit we must keep intact during adaptation."""
     return [line[4:].strip() for line in cv_md.splitlines() if line.startswith("### ")]
 
 
@@ -59,6 +49,25 @@ def _verify_cv_facts(cv_base_md: str, adapted_md: str) -> list[str]:
     return violations
 
 
+def _build_proposal_prompt(profile: dict, listing: Listing, language: str, contact_name: str) -> str:
+    notes = (profile.get("scorer_notes") or "").strip()
+    user_pref_block = ""
+    if notes:
+        user_pref_block = (
+            "# User preferences (mandatory — apply when drafting)\n\n"
+            f"{notes}\n\n"
+        )
+    return (
+        _PROMPT_PROP.replace("{{candidate_block}}", render_candidate_block(profile))
+        .replace("{{user_pref_block}}", user_pref_block)
+        .replace("{{candidate_name}}", str(profile.get("full_name") or ""))
+        .replace("{{title}}", listing.title)
+        .replace("{{description}}", (listing.description or "")[:4000])
+        .replace("{{language}}", language)
+        .replace("{{contact_name}}", contact_name)
+    )
+
+
 def draft_one(listing: Listing) -> Draft:
     profile = load_profile()
     cv_language = listing.language or "en"
@@ -66,20 +75,12 @@ def draft_one(listing: Listing) -> Draft:
 
     contact_name = _extract_contact_name(listing.description or "")
 
-    rendered_prop = (
-        _PROMPT_PROP.replace("{{profile_blurb}}", _profile_blurb(profile))
-        .replace("{{candidate_name}}", str(profile.get("full_name") or ""))
-        .replace("{{anchor_case_studies}}", _case_studies(profile))
-        .replace("{{title}}", listing.title)
-        .replace("{{description}}", (listing.description or "")[:4000])
-        .replace("{{language}}", cv_language)
-        .replace("{{contact_name}}", contact_name)
-    )
+    rendered_prop = _build_proposal_prompt(profile, listing, cv_language, contact_name)
     rendered_cv = _PROMPT_CV.replace("{{cv_base_markdown}}", cv_base_md).replace(
         "{{listing_full}}", f"{listing.title}\n\n{listing.description or ''}"
     )
 
-    body = call_text(model=_MODEL_DRAFT, system="You write proposals.", user=rendered_prop, max_tokens=800)
+    body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=2000)
     cv_md = call_text(
         model=_MODEL_DRAFT,
         system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
@@ -104,3 +105,24 @@ def draft_one(listing: Listing) -> Draft:
     write_draft(draft)
     update_listing_status(listing.id, ListingStatus.DRAFTED)
     return draft
+
+
+def main() -> None:
+    """Draft every scored listing that doesn't yet have a draft.
+
+    Driven by the daily cron after score.py. Cron order is
+    discover → filter → score → draft.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    rows = list_by_status(ListingStatus.SCORED)
+    log.info("drafting %d scored listings with %s", len(rows), _MODEL_DRAFT)
+    for row in rows:
+        listing_id = str(row["id"])
+        try:
+            draft_one(Listing.model_validate(row))
+        except Exception as exc:  # noqa: BLE001 — survive the loop
+            log.error("draft failed for %s: %s", listing_id, exc)
+
+
+if __name__ == "__main__":
+    main()

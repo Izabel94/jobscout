@@ -1,28 +1,58 @@
-"""Phase 8 smoke tests — verify draft pipeline wiring without hitting an LLM."""
+"""Smoke tests for draft.py — verify wiring without hitting an LLM."""
 
 from unittest.mock import patch
 
 import pytest
 
-from jobscout.draft import _extract_contact_name, _verify_cv_facts, draft_one
+from jobscout.draft import (
+    _build_proposal_prompt,
+    _extract_contact_name,
+    _PROMPT_CV,
+    _verify_cv_facts,
+    draft_one,
+)
 from jobscout.models import Draft, Listing, ListingStatus, Source
 
-_CV_BASE_EN = "# Test User\n\n" "## Work\n\n" "### Acme Corp | Berlin\n" "*2019 - 2021*\n\n" "- Built things.\n"
-_CV_BASE_DE = (
-    "# Test User\n\n" "## Berufserfahrung\n\n" "### Acme Corp | Berlin\n" "*2019 - 2021*\n\n" "- Dinge gebaut.\n"
+_CV_BASE_EN = (
+    "# Test Candidate\n\n"
+    "test@example.com · <https://linkedin.example/x>\n\n"
+    "**Senior Performance Marketing Manager**\n\n"
+    "## Experience\n\n"
+    "### Acme Corp | Berlin\n\n"
+    "**Senior Manager** | *2019 – 2021*\n\n"
+    "Built things.\n"
 )
+_CV_BASE_DE = (
+    "# Test Candidate\n\n"
+    "**Senior Performance Marketing Manager**\n\n"
+    "## Berufserfahrung\n\n"
+    "### Acme Corp | Berlin\n\n"
+    "**Senior Manager** | *2019 – 2021*\n\n"
+    "Dinge gebaut.\n"
+)
+
+
+def _profile() -> dict:
+    return {
+        "full_name": "Test Candidate",
+        "headline": "Senior Performance Marketing Manager",
+        "location": "Hamburg, Germany",
+        "skills": ["Google Ads", "Programmatic Media Buying"],
+        "positions": [
+            {
+                "title": "Senior Manager",
+                "company": "Acme Corp",
+                "start": "2019",
+                "end": "2021",
+                "description": "Built things.",
+            }
+        ],
+    }
 
 
 @pytest.fixture(autouse=True)
 def _profile_and_cv(monkeypatch):
-    monkeypatch.setattr(
-        "jobscout.draft.load_profile",
-        lambda: {
-            "full_name": "Test User",
-            "required_skill_keywords": ["LangChain", "RAG"],
-            "anchor_summaries": [{"title": "T", "summary": "S"}],
-        },
-    )
+    monkeypatch.setattr("jobscout.draft.load_profile", _profile)
     monkeypatch.setattr(
         "jobscout.draft.load_cv_markdown",
         lambda language: _CV_BASE_DE if language.lower().startswith("de") else _CV_BASE_EN,
@@ -35,8 +65,8 @@ def _listing(language: str = "en") -> Listing:
         source=Source.LINKEDIN,
         source_id="x",
         url="https://x",
-        title="LangChain engineer",
-        description="Build a production RAG pipeline",
+        title="Performance Marketing Manager",
+        description="Lead programmatic campaigns",
         language=language,
         raw={},
     )
@@ -47,16 +77,14 @@ def _listing(language: str = "en") -> Listing:
 @patch("jobscout.draft.call_text")
 def test_draft_one_persists_and_updates_status(mock_call, mock_write, mock_update):
     base = _CV_BASE_EN
-    # The "adapted" CV is the unchanged base — that's a valid surgical edit
-    # (zero changes) and must always preserve facts.
-    mock_call.side_effect = ["proposal body text", base]
+    mock_call.side_effect = ["cover letter body", base]
     mock_write.return_value = "draft-uuid"
 
     draft = draft_one(_listing())
 
     assert isinstance(draft, Draft)
     assert draft.listing_id == "ulistid"
-    assert draft.body == "proposal body text"
+    assert draft.body == "cover letter body"
     assert draft.adapted_cv == base
     mock_write.assert_called_once()
     mock_update.assert_called_once_with("ulistid", ListingStatus.DRAFTED)
@@ -67,7 +95,7 @@ def test_draft_one_persists_and_updates_status(mock_call, mock_write, mock_updat
 @patch("jobscout.draft.write_draft")
 @patch("jobscout.draft.call_text")
 def test_draft_one_raises_when_employer_header_drops(mock_call, mock_write, mock_update):
-    mock_call.side_effect = ["proposal body", "# Someone\n\nGeneric content with no facts.\n"]
+    mock_call.side_effect = ["cover letter body", "# Someone\n\nGeneric content with no facts.\n"]
 
     with pytest.raises(ValueError, match="broke fact preservation"):
         draft_one(_listing())
@@ -81,13 +109,12 @@ def test_draft_one_raises_when_employer_header_drops(mock_call, mock_write, mock
 @patch("jobscout.draft.call_text")
 def test_draft_one_german_listing_uses_german_cv(mock_call, mock_write, mock_update):
     base_de = _CV_BASE_DE
-    mock_call.side_effect = ["Bewerbung text", base_de]
+    mock_call.side_effect = ["Bewerbungstext", base_de]
     mock_write.return_value = "draft-uuid"
 
     draft = draft_one(_listing(language="de"))
 
     assert draft.language == "de"
-    # Verify the German CV was loaded — it has the German section heading.
     assert "Berufserfahrung" in draft.adapted_cv
 
 
@@ -125,29 +152,17 @@ def test_verify_cv_facts_clean_pass():
     assert _verify_cv_facts(base, adapted) == []
 
 
-def test_proposal_prompt_renders_without_unfilled_placeholders():
-    from jobscout.draft import _PROMPT_PROP, _case_studies, _profile_blurb
-
-    profile = {
-        "full_name": "Test",
-        "required_skill_keywords": ["LangChain", "RAG"],
-        "anchor_summaries": [{"title": "T", "summary": "S"}],
-    }
-    rendered = (
-        _PROMPT_PROP.replace("{{profile_blurb}}", _profile_blurb(profile))
-        .replace("{{candidate_name}}", profile["full_name"])
-        .replace("{{anchor_case_studies}}", _case_studies(profile))
-        .replace("{{title}}", "title")
-        .replace("{{description}}", "desc")
-        .replace("{{language}}", "en")
-        .replace("{{contact_name}}", "")
-    )
+def test_proposal_prompt_includes_candidate_fields():
+    listing = _listing()
+    rendered = _build_proposal_prompt(_profile(), listing, "en", "")
     assert "{{" not in rendered
+    assert "Test Candidate" in rendered
+    assert "Senior Performance Marketing Manager" in rendered
+    assert "Google Ads" in rendered
+    assert "Acme Corp" in rendered
 
 
 def test_cv_prompt_renders_without_unfilled_placeholders():
-    from jobscout.draft import _PROMPT_CV
-
     rendered = _PROMPT_CV.replace("{{cv_base_markdown}}", "# Test\n\n## Work\n").replace(
         "{{listing_full}}", "title\n\ndesc"
     )

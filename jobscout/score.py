@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from jobscout.config_loader import load_profile
+from jobscout.config_loader import load_profile, render_candidate_block
 from jobscout.db import list_unscored_new_listings, update_listing_status
 from jobscout.llm import LLMJSONError, call_json
 from jobscout.models import Listing, ListingStatus
@@ -11,37 +11,28 @@ from jobscout.models import Listing, ListingStatus
 log = logging.getLogger("score")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-_MODEL_SCORE = "gemini-2.5-flash"  # spec decision
+_MODEL_SCORE = "gemini-3.1-flash-lite"  # spec §10 decision
 _PROMPT = (Path(__file__).resolve().parent.parent / "config" / "prompts" / "score.v1.md").read_text()
 
 
-def _render(template: str, listing: Listing) -> str:
-    return (
-        template.replace("{{title}}", listing.title)
-        .replace("{{description}}", (listing.description or "")[:3000])
-        .replace("{{rate_min}}", str(listing.rate_min or ""))
-        .replace("{{rate_max}}", str(listing.rate_max or ""))
-        .replace("{{currency}}", listing.currency or "")
-        .replace("{{rate_unit}}", listing.rate_unit.value if listing.rate_unit else "")
-        .replace("{{hours_per_week}}", str(listing.hours_per_week or ""))
-        .replace("{{language}}", listing.language or "")
-        .replace("{{posted_at}}", str(listing.posted_at or ""))
-    )
-
-
 def _build_score_prompt(profile: dict, listing: dict) -> str:
-    """Pure helper: render the score prompt with optional user-pref block.
+    """Render the score prompt with the candidate sourced from the profiles row.
 
-    profile.scorer_notes (free-text from the Settings tab) is prepended
-    as a 'User preferences' header so the LLM sees it before the role.
-    Empty / missing notes => no header rendered.
+    profile.scorer_notes (free-text from the Settings tab) is rendered as a
+    'User preferences' header so the LLM sees it before the listing. Empty /
+    missing notes => no header rendered.
     """
     notes = (profile.get("scorer_notes") or "").strip()
     user_pref_block = ""
     if notes:
-        user_pref_block = "## User preferences (mandatory context — apply when ranking)\n" f"{notes}\n\n"
-    body = (
-        _PROMPT.replace("{{title}}", listing.get("title", "") or "")
+        user_pref_block = (
+            "# User preferences (mandatory — apply as a hard filter)\n\n"
+            f"{notes}\n\n"
+        )
+    return (
+        _PROMPT.replace("{{candidate_block}}", render_candidate_block(profile))
+        .replace("{{user_pref_block}}", user_pref_block)
+        .replace("{{title}}", listing.get("title", "") or "")
         .replace("{{description}}", (listing.get("description") or "")[:3000])
         .replace("{{rate_min}}", str(listing.get("rate_min") or ""))
         .replace("{{rate_max}}", str(listing.get("rate_max") or ""))
@@ -51,7 +42,6 @@ def _build_score_prompt(profile: dict, listing: dict) -> str:
         .replace("{{language}}", listing.get("language") or "")
         .replace("{{posted_at}}", str(listing.get("posted_at") or ""))
     )
-    return f"{user_pref_block}{body}"
 
 
 def main() -> None:
@@ -66,7 +56,7 @@ def main() -> None:
                 model=_MODEL_SCORE,
                 system="You output JSON only.",
                 user=_build_score_prompt(profile, listing.model_dump(mode="json")),
-                max_tokens=400,
+                max_tokens=2000,
             )
             update_listing_status(
                 listing_id,

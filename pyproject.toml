@@ -30,6 +30,7 @@ dependencies = [
     "notify-py (>=0.3,<0.4)",
     "pypdf (>=4.0,<5.0)",
     "streamlit-shadcn-ui (>=0.1,<0.3)",
+    "markdownify (>=0.13.1,<0.14.0)",
 ]
 
 

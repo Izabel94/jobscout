@@ -49,6 +49,7 @@ def render_kpi_hero() -> None:
         _kpi_tile("In dashboard", str(in_dashboard))
     with col4:
         _kpi_tile("Submitted (7d)", str(submitted_7d))
+    st.divider()
 
 
 _PAGE_SIZE = 20

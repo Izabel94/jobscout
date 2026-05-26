@@ -28,4 +28,4 @@ Every fact below is true. You may:
 
 ## Output
 
-The modified CV markdown — only. Start directly with `# Izabel Cvetkovic`. Identical to the input wherever no truthful listing-relevant change applies.
+The modified CV markdown — only. Start with the candidate's existing `# Name` heading from the input above (do not change it). Identical to the input wherever no truthful listing-relevant change applies.

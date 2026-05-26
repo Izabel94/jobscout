@@ -7,6 +7,7 @@ from jobspy import scrape_jobs
 
 from jobscout.derive import classify_apply_method, classify_arrangement, classify_job_type
 from jobscout.models import Listing, RateUnit, Source
+from jobscout.sources._description import html_to_markdown
 from jobscout.sources.base import BRAND_UA, CadenceRule, SourceAdapter
 
 _JSON_SAFE_TYPES = (str, int, float, bool, list, dict, type(None))
@@ -96,11 +97,11 @@ class LinkedInSource(SourceAdapter):
                 is_remote=True,
                 job_type="contract",
                 linkedin_fetch_description=True,
+                description_format="html",
             )
             for _, row in df.iterrows():
                 d: dict[str, Any] = row.to_dict()
-                # Company denylist deferred — re-introduce in Phase 4 from profiles.title_denylist.
-                description = str(d.get("description") or "")
+                description = html_to_markdown(d.get("description"))
                 rate_min, rate_max, rate_unit, currency = _parse_rate_from_description(description)
                 arrangement, arr_ev = classify_arrangement(d)
                 job_type_classified, jt_ev = classify_job_type(d)
