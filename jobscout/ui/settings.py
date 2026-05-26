@@ -186,7 +186,7 @@ def render_save_bar() -> None:
             if st.button("Save changes", key="save", type="primary", use_container_width=True):
                 save_profile_changes(pending)
                 st.session_state.pop("pending_profile", None)
-                st.toast("Saved.", icon="✓")
+                st.toast("Saved.", icon="✅")
                 st.rerun()
 
 
