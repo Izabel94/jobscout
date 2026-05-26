@@ -56,7 +56,7 @@ Rules for choosing an action:
 - `select` — dropdowns / select elements. `value` must be one of the option labels listed for that field. Match the candidate's profile to the closest available option.
 - `check` — checkboxes / radios that should be ticked. For "I accept the terms" / "I am authorized to work" / required acknowledgements: check them.
 - `uncheck` — for opt-in marketing checkboxes: leave unchecked.
-- `attach` — file inputs. `value` must be `"cv_pdf"` (the CV PDF path will be resolved by the script).
+- `attach` — ONLY for fields whose `kind=file` in the list above. Never `attach` on text/email/textarea/select even if the label mentions a CV — the actual file input is always a separate `kind=file` row. `value` must be `"cv_pdf"`.
 - `skip` — when you're not sure, OR when the field is EEOC/voluntary self-identification (gender, race, disability, veteran status). The user will fill these manually.
 
 Rules for sensitive fields:

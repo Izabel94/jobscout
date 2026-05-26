@@ -80,12 +80,27 @@ def _think_pause(page: Page, seconds_range: tuple[float, float], label: str) -> 
 
 # Single page.evaluate for a consistent snapshot. Each field is marked
 # with a `data-ats-id` so selectors survive re-renders that would break CSS paths.
+# IDs are STABLE across enumerate passes: elements that already carry a
+# data-ats-id keep it (so the iterate-DOM round-tracker can rely on
+# `seen_field_ids`). New IDs are minted only for elements that lack one,
+# starting past the highest existing numeric suffix.
 _ENUM_JS = r"""
 () => {
   const fields = [];
   let n = 0;
+  const used = new Set();
+  document.querySelectorAll('[data-ats-id]').forEach((el) => {
+    const id = el.getAttribute('data-ats-id');
+    used.add(id);
+    const m = id && id.match(/^__ats_(\d+)$/);
+    if (m) n = Math.max(n, parseInt(m[1], 10) + 1);
+  });
   const mark = (el) => {
-    const id = `__ats_${n++}`;
+    const existing = el.getAttribute('data-ats-id');
+    if (existing) return existing;
+    let id;
+    do { id = `__ats_${n++}`; } while (used.has(id));
+    used.add(id);
     el.setAttribute('data-ats-id', id);
     return id;
   };
