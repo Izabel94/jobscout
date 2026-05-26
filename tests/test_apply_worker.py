@@ -32,7 +32,10 @@ def test_process_one_dispatches_external_apply_listing(fake_external_apply, fake
         "title": "Senior Performance Marketing",
         "description": "Lead programmatic at AdTechCo",
         "url": "https://www.linkedin.com/jobs/view/4123456789/",
-        "company_url_direct": "https://boards.greenhouse.io/adtechco/jobs/123",
+        "raw": {
+            "job_url_direct": "https://boards.greenhouse.io/adtechco/jobs/123",
+            "company_url_direct": "https://adtechco.example",
+        },
         "apply_method": "external_apply",
         "source": "linkedin",
     }
@@ -60,7 +63,38 @@ def test_process_one_dispatches_external_apply_listing(fake_external_apply, fake
     assert record_calls == [("req-1", "listing-1", "draft-1")]
 
 
-def test_process_one_falls_back_to_listing_url_when_no_company_url_direct(
+def test_process_one_prefers_job_url_direct_over_company_url_direct(
+    fake_external_apply, fake_render_cv, monkeypatch
+):
+    """raw.job_url_direct is the specific apply URL; raw.company_url_direct is the
+    company careers homepage (often useless). Worker must prefer the specific URL."""
+    from jobscout.apply import worker
+
+    listing = {
+        "id": "listing-1",
+        "title": "X",
+        "description": "Y",
+        "url": "https://de.indeed.com/viewjob?jk=abc",
+        "raw": {
+            "job_url_direct": "https://jobdb.softgarden.de/job/64822241",
+            "company_url_direct": "https://www.donner-reuschel.de",
+        },
+        "apply_method": "external_apply",
+        "source": "indeed",
+    }
+    draft = {"id": "draft-1", "body": "…", "adapted_cv": "…"}
+    monkeypatch.setattr(worker, "_fetch_listing", lambda _: listing)
+    monkeypatch.setattr(worker, "_fetch_latest_draft", lambda _: draft)
+    monkeypatch.setattr(worker, "_record_submission_and_mark_done", lambda *a: None)
+    monkeypatch.setattr(worker, "_open_render_tab", lambda: MagicMock())
+
+    worker.process_one({"id": "req", "listing_id": "listing-1", "source": "indeed"})
+
+    calls, _ = fake_external_apply
+    assert calls[0]["ats_url"] == "https://jobdb.softgarden.de/job/64822241"
+
+
+def test_process_one_falls_back_to_listing_url_when_no_raw_signals(
     fake_external_apply, fake_render_cv, monkeypatch
 ):
     from jobscout.apply import worker
@@ -70,7 +104,7 @@ def test_process_one_falls_back_to_listing_url_when_no_company_url_direct(
         "title": "X",
         "description": "Y",
         "url": "https://example.com/apply",
-        "company_url_direct": None,
+        "raw": {},
         "apply_method": "external_apply",
         "source": "indeed",
     }
