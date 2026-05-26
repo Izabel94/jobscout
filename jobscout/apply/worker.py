@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import secrets
 import sys
 import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -92,12 +93,31 @@ def _close_render_tab(page) -> None:
         page._jobscout_pw.stop()  # type: ignore[attr-defined]
 
 
+_NAME_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _candidate_name_slug() -> str:
+    """Return a lowercase ASCII slug of the candidate's full_name from the
+    profiles row — used as the CV PDF filename so the recipient sees the
+    candidate's name on the attachment, not 'jobscout-cv'."""
+    from jobscout.config_loader import load_profile
+
+    name = (load_profile().get("full_name") or "").strip().lower()
+    slug = _NAME_SLUG_RE.sub("_", name).strip("_")
+    return slug or "candidate"
+
+
 def _render_cv_pdf(cv_markdown: str, **_kwargs: object) -> Path:
-    """Render the adapted CV markdown to a PDF in temp dir, return its path."""
+    """Render the adapted CV markdown to a PDF in temp dir, return its path.
+
+    Filename: `<candidate_name_slug>_<random>.pdf` — the recipient sees the
+    candidate's name on the attachment, not the tool name. The random suffix
+    keeps successive queued applies for the same listing from colliding.
+    """
     from jobscout.cv_render import cv_markdown_to_pdf
 
-    stamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
-    out = Path(tempfile.gettempdir()) / f"jobscout-cv-{stamp}.pdf"
+    suffix = secrets.token_hex(4)  # 8 hex chars, ~32 bits of entropy — plenty for filename uniqueness
+    out = Path(tempfile.gettempdir()) / f"{_candidate_name_slug()}_{suffix}.pdf"
     page = _open_render_tab()
     try:
         cv_markdown_to_pdf(cv_markdown, out, page=page)
