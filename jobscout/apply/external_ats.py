@@ -48,6 +48,8 @@ def _assert_not_easy_apply(page: Page) -> None:
 
 _PAGE_THINK_SECONDS = (10.0, 18.0)
 _FIELD_THINK_SECONDS = (0.6, 1.8)
+_INTER_ROUND_WAIT_MS = 1_500
+_MAX_ROUNDS = 3
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "config" / "prompts"
 _PROMPT_PATH = _PROMPTS_DIR / "ats_form_fill.v1.md"
@@ -194,6 +196,38 @@ _ENUM_JS = r"""
 
 def _enumerate_fields(page: Page) -> list[dict[str, Any]]:
     return page.evaluate(_ENUM_JS) or []
+
+
+def _select_round_targets(fields: list[dict[str, Any]], seen_ids: set[str]) -> list[dict[str, Any]]:
+    """Pure helper — round 2+ target selection.
+
+    Returns the subset of `fields` the LLM should be asked about in this round:
+      - any field whose id wasn't in a previous round's prompt, AND
+      - any field already seen but whose currentValue is now empty (re-render
+        cleared a previously-filled textarea, common with React-based ATS forms
+        where a CV upload triggers form-state reset of the cover letter field).
+
+    Checkbox / radio fields use 'checked' / 'unchecked' for currentValue —
+    'unchecked' is a meaningful state, not 'empty', so don't re-target those.
+    """
+    empty_markers = ("", None)
+    targets: list[dict[str, Any]] = []
+    for f in fields:
+        fid = f.get("id")
+        if not isinstance(fid, str):
+            continue
+        if fid not in seen_ids:
+            targets.append(f)
+            continue
+        kind = (f.get("kind") or "").lower()
+        if kind in ("checkbox", "radio"):
+            continue  # already-seen checkbox state is meaningful even if "unchecked"
+        current = f.get("currentValue")
+        if isinstance(current, str):
+            current = current.strip()
+        if current in empty_markers:
+            targets.append(f)
+    return targets
 
 
 # --- LLM mapping -------------------------------------------------------------
@@ -534,44 +568,72 @@ def _run(
 
         _think_pause(page, _PAGE_THINK_SECONDS, "page-load (LLM drafting)")
 
-        fields = _enumerate_fields(page)
-        print(f"Enumerated {len(fields)} field(s)", flush=True)
-        if not fields:
-            print(
-                "No fillable form fields detected after walking apply CTAs. "
-                "The page may be a login wall, an account-creation step, "
-                "or a non-standard widget. Inspect manually.",
-                flush=True,
-            )
-            page.wait_for_event("close", timeout=0)
-            return
+        # Iterative fill — many ATS forms (React-based: Greenhouse, Softgarden,
+        # Lever) reveal conditional fields after earlier ones are filled
+        # (country → state, file upload → autoparsed details) AND re-render
+        # previously-filled controls back to empty. A single enumerate-then-fill
+        # pass loses both classes. Loop: enumerate → LLM → fill → wait for
+        # re-renders → re-enumerate. Cap at _MAX_ROUNDS to stop runaways.
+        seen_field_ids: set[str] = set()
+        total_applied = 0
+        total_actions = 0
+        round_n = 0
 
-        try:
-            actions = _ask_llm_for_actions(
-                fields=fields,
-                cover_letter=proposal,
-                adapted_cv=adapted_cv_md,
-                listing_title=listing_title,
-                listing_description=listing_description,
-            )
-        except Exception as e:
-            print(f"LLM mapping failed ({e}); leaving form blank for manual fill", flush=True)
-            page.wait_for_event("close", timeout=0)
-            return
+        for round_n in range(1, _MAX_ROUNDS + 1):
+            fields = _enumerate_fields(page)
+            if round_n == 1:
+                print(f"Round 1: enumerated {len(fields)} field(s)", flush=True)
+                if not fields:
+                    print(
+                        "No fillable form fields detected after walking apply CTAs. "
+                        "The page may be a login wall, an account-creation step, "
+                        "or a non-standard widget. Inspect manually.",
+                        flush=True,
+                    )
+                    page.wait_for_event("close", timeout=0)
+                    return
+                targets = fields
+            else:
+                targets = _select_round_targets(fields, seen_field_ids)
+                print(
+                    f"Round {round_n}: enumerated {len(fields)} field(s), "
+                    f"targeting {len(targets)} (new or now-empty)",
+                    flush=True,
+                )
+                if not targets:
+                    break
 
-        print(f"LLM produced {len(actions)} action(s)", flush=True)
-        applied = 0
-        for action in actions:
-            _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
-            ok, note = _apply_action(page, action, cv_pdf_path, proposal)
-            label_hint = action.get("selector", "?")
-            print(f"  [{'OK' if ok else 'SKIP'}] {label_hint}  action={action.get('action')}  {note}", flush=True)
-            if ok and (action.get("action") or "").lower() != "skip":
-                applied += 1
+            try:
+                actions = _ask_llm_for_actions(
+                    fields=targets,
+                    cover_letter=proposal,
+                    adapted_cv=adapted_cv_md,
+                    listing_title=listing_title,
+                    listing_description=listing_description,
+                )
+            except Exception as e:
+                print(f"LLM mapping failed in round {round_n} ({e}); aborting round loop", flush=True)
+                break
+
+            seen_field_ids.update(str(f["id"]) for f in targets if f.get("id"))
+            total_actions += len(actions)
+
+            print(f"Round {round_n}: LLM produced {len(actions)} action(s)", flush=True)
+            for action in actions:
+                _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
+                ok, note = _apply_action(page, action, cv_pdf_path, proposal)
+                label_hint = action.get("selector", "?")
+                print(f"  [{'OK' if ok else 'SKIP'}] {label_hint}  action={action.get('action')}  {note}", flush=True)
+                if ok and (action.get("action") or "").lower() != "skip":
+                    total_applied += 1
+
+            # Wait for the page to render any conditional fields revealed by
+            # the fills (or to surface re-renders that cleared a previous fill).
+            page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
 
         print(
-            f"Filled {applied}/{len(actions)} fields. Review the form, fix anything the "
-            "LLM skipped, then click Submit yourself.",
+            f"Filled {total_applied}/{total_actions} fields across {round_n} round(s). "
+            "Review the form, fix anything the LLM skipped, then click Submit yourself.",
             flush=True,
         )
         page.wait_for_event("close", timeout=0)
