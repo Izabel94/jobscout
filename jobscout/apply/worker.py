@@ -39,11 +39,32 @@ def _fetch_latest_draft(listing_id: str) -> dict[str, Any] | None:
 
 
 def _ats_url_for(listing: dict[str, Any]) -> str:
-    """Greenhouse / Lever / Workable / employer direct URL parsed by derive.py
-    lives in `company_url_direct`. Fall back to the listing URL if absent
-    (e.g. Indeed listings where derive marked it EXTERNAL_APPLY based on a
-    different signal)."""
-    return str(listing.get("company_url_direct") or listing["url"])
+    """Resolve the URL the apply worker should attach to.
+
+    JobSpy populates two related signals inside `listings.raw` (JSONB), NOT as
+    top-level columns:
+      - `raw.job_url_direct`  — the specific job's apply URL (Softgarden,
+        Greenhouse, Lever, ICIMS, Recruitee, etc.). This is what we want.
+      - `raw.company_url_direct` — the company's careers homepage. Usually
+        useless for a single apply (lands on a search page).
+
+    Reading from the top level (the old behaviour) always returned None,
+    causing every Indeed external_apply listing to fall back to
+    listing.url — the Indeed wrapper, whose only Apply CTA is
+    `<button id="indeedApplyButton">Mit Indeed bewerben</button>` (no href,
+    opens an in-page modal external_ats can't drive).
+
+    Resolution order:
+      1. raw.job_url_direct  — preferred, deep link into the ATS form
+      2. raw.company_url_direct  — fallback, careers homepage
+      3. listing.url  — last resort (Indeed/LinkedIn wrapper)
+    """
+    raw = listing.get("raw") or {}
+    return str(
+        raw.get("job_url_direct")
+        or raw.get("company_url_direct")
+        or listing["url"]
+    )
 
 
 def _open_render_tab():
