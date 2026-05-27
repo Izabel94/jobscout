@@ -212,7 +212,7 @@ def render(listing: dict[str, Any]) -> None:
                                 source=listing.get("source") or "",
                             )
                             st.toast(
-                                "Apply queued — the worker will pick it up within 5 minutes.",
+                                "Apply queued — the worker will pick it up within a minute.",
                                 icon="✅",
                             )
                             st.rerun()
