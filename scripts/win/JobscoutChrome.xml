@@ -36,7 +36,8 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>%USERPROFILE%\jobscout\scripts\win\chrome-cdp.bat</Command>
+      <Command>wscript.exe</Command>
+      <Arguments>"%USERPROFILE%\jobscout\scripts\win\run-hidden.vbs" "%USERPROFILE%\jobscout\scripts\win\chrome-cdp.bat"</Arguments>
       <WorkingDirectory>%USERPROFILE%\jobscout</WorkingDirectory>
     </Exec>
   </Actions>
