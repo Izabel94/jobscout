@@ -6,7 +6,7 @@ name: daily
 
 on:
   schedule:
-    - cron: "40 15 * * *"  # TEMP: test fire 15:40 UTC 2026-05-27 to verify GHA scheduler; restore to "50 9 * * *" (morning Berlin) after
+    - cron: "20 15 * * *"  # TEMP: test fire 15:20 UTC 2026-05-27 to verify GHA scheduler; restore to "50 9 * * *" (morning Berlin) after
   workflow_dispatch: {}
 
 permissions:
