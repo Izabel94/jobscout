@@ -1,6 +1,7 @@
 param(
     [string]$PythonVersion = "3.13.3",
-    [string]$MinGitVersion = "2.49.0.windows.1",
+    [string]$MinGitVersion = "2.54.0",
+    [string]$MinGitBuild   = "1",
     [string]$SshRemote = "git@github.com:Izabel94/jobscout.git"
 )
 
@@ -28,10 +29,13 @@ if (-not (Test-Path $pyExe)) {
 }
 
 # --- 2. MinGit (portable git for the updater) ------------------------------
-$minGitZip = Join-Path $cache "MinGit-$MinGitVersion.zip"
+$minGitZip = Join-Path $cache "MinGit-$MinGitVersion-64-bit.zip"
 if (-not (Test-Path $minGitZip)) {
-    $tag = "v" + ($MinGitVersion -replace '\.windows\.', '.windows.')
-    $mgUrl = "https://github.com/git-for-windows/git/releases/download/$tag/MinGit-$MinGitVersion-64-bit.zip"
+    # Git for Windows tags include the build suffix (v2.54.0.windows.1) but the
+    # MinGit asset filename uses only the short version (MinGit-2.54.0-64-bit.zip).
+    $tag = "v$MinGitVersion.windows.$MinGitBuild"
+    $asset = "MinGit-$MinGitVersion-64-bit.zip"
+    $mgUrl = "https://github.com/git-for-windows/git/releases/download/$tag/$asset"
     Write-Host "Downloading MinGit $MinGitVersion..."
     Invoke-WebRequest -Uri $mgUrl -OutFile $minGitZip -UseBasicParsing
 }
