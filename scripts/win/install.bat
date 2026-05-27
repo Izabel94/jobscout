@@ -32,10 +32,19 @@ if not exist "%JOBSCOUT_REPO%\.git" (
 )
 
 REM --- 2. Python (user-scope, no admin) --------------------------------------
-py -3.13 --version >nul 2>&1
-if errorlevel 1 (
+REM Detect an existing Python 3.13 first (py launcher, else a 3.13 on PATH) so we
+REM never trigger the installer's repair/modify dialog on a machine that already
+REM has Python. Only install if genuinely absent, and use /passive (visible
+REM progress) instead of /quiet, which can hang silently behind a dialog.
+set "PYLAUNCH="
+py -3.13 --version >nul 2>&1 && set "PYLAUNCH=py -3.13"
+if not defined PYLAUNCH (
+    python --version 2>&1 | findstr /b "Python 3.13" >nul && set "PYLAUNCH=python"
+)
+if not defined PYLAUNCH (
     call :log "Installing Python 3.13..."
-    start /wait "" "%HERE%python-3.13-amd64.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0 >> "%LOG_FILE%" 2>&1
+    start /wait "" "%HERE%python-3.13-amd64.exe" /passive InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0
+    set "PYLAUNCH=py -3.13"
 )
 
 REM --- 3. MinGit (for the hourly updater) ------------------------------------
@@ -48,7 +57,7 @@ REM --- 4. venv + deps --------------------------------------------------------
 set "PYTHON=%JOBSCOUT_REPO%\.venv\Scripts\python.exe"
 if not exist "%PYTHON%" (
     call :log "Creating Python environment..."
-    py -3.13 -m venv "%JOBSCOUT_REPO%\.venv" >> "%LOG_FILE%" 2>&1
+    %PYLAUNCH% -m venv "%JOBSCOUT_REPO%\.venv" >> "%LOG_FILE%" 2>&1
 )
 call :log "Installing dependencies (this is the slow part)..."
 "%PYTHON%" -m pip install --upgrade pip >> "%LOG_FILE%" 2>&1
