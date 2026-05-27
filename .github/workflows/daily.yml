@@ -6,7 +6,7 @@ name: daily
 
 on:
   schedule:
-    - cron: "50 9 * * *"  # 09:50 UTC = 10:50 / 11:50 Berlin local depending on DST
+    - cron: "40 15 * * *"  # TEMP: test fire 15:40 UTC 2026-05-27 to verify GHA scheduler; restore to "50 9 * * *" (morning Berlin) after
   workflow_dispatch: {}
 
 permissions:
@@ -23,10 +23,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+      - run: pipx install poetry
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.13"
-      - run: pipx install poetry
+          cache: poetry
       - run: poetry install --no-interaction
 
       - name: Run discover for ${{ matrix.source }}
@@ -50,10 +51,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+      - run: pipx install poetry
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.13"
-      - run: pipx install poetry
+          cache: poetry
       - run: poetry install --no-interaction
       - name: Run freshness sweep
         env:
@@ -69,10 +71,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+      - run: pipx install poetry
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.13"
-      - run: pipx install poetry
+          cache: poetry
       - run: poetry install --no-interaction
       - name: Run filter
         env:
@@ -88,10 +91,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+      - run: pipx install poetry
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.13"
-      - run: pipx install poetry
+          cache: poetry
       - run: poetry install --no-interaction
       - name: Run score
         env:
