@@ -7,7 +7,7 @@ A few one-time steps. It takes about 5 minutes. You only do this once.
 1. Find the file `jobscout-windows.zip` in your Syncthing folder (or on the USB stick).
 2. Right-click it and choose **Extract All**. A folder appears.
 3. Open that folder and double-click **install.bat**.
-4. A black window opens and runs for a few minutes. **Don't close it** — it's downloading everything it needs.
+4. A black window opens and runs for a few minutes. **Don't close it** - it's downloading everything it needs.
 5. When it says **"Install complete"**, send Izabel a text. She'll finish the last bit remotely.
 
 That's it. You don't need to type anything or change any files.
@@ -23,4 +23,4 @@ That's the whole routine.
 
 ## If something looks wrong
 
-Text Izabel. Please don't change or delete any files — she can fix everything remotely.
+Text Izabel. Please don't change or delete any files - she can fix everything remotely.

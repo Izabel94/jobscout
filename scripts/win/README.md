@@ -1,9 +1,9 @@
-# Jobscout on Windows — operator runbook
+# Jobscout on Windows - operator runbook
 
 Phase 5b ships a one-time ZIP bootstrap. The operator builds it on her Windows
 laptop, drops it in Syncthing, and the end user double-clicks `install.bat`.
 After that, code updates flow automatically via the hourly `Jobscout\Update`
-task — no re-ship, no re-install.
+task - no re-ship, no re-install.
 
 Architecture: discovery + apply both run **locally on the end-user laptop**, the
 same 5-min-poll model sidegig uses on the operator's Mac (here: 1-min poll). The
@@ -17,8 +17,8 @@ Streamlit dashboard runs on Streamlit Cloud and is reached from any browser.
    ssh-keygen -t ed25519 -f jobscout_deploy -N "" -C "jobscout-deploy"
    ```
 
-   Add `jobscout_deploy.pub` to the repo's **Settings → Deploy keys** (read-only,
-   do NOT check "Allow write access"). Keep `jobscout_deploy` (private) safe — it
+   Add `jobscout_deploy.pub` to the repo's **Settings -> Deploy keys** (read-only,
+   do NOT check "Allow write access"). Keep `jobscout_deploy` (private) safe - it
    goes on the end-user machine later. Deploy keys are single-repo scoped and
    don't expire, unlike fine-grained PATs.
 
@@ -32,12 +32,12 @@ Produces `dist\jobscout-windows-<date>.zip` containing: the repo (with `.git`,
 origin preset to the SSH URL), a python.org user-scope installer, MinGit, and the
 bootstrap scripts. Drop the ZIP in the Syncthing folder shared with the end user.
 
-> Build must run on Windows — Python wheels (lxml, sentence-transformers,
+> Build must run on Windows - Python wheels (lxml, sentence-transformers,
 > playwright) are platform-specific; there is no cross-build from macOS.
 
 ## End-user install (they do this)
 
-See [`INSTALL.md`](INSTALL.md) — extract ZIP, double-click `install.bat`, wait,
+See [`INSTALL.md`](INSTALL.md) - extract ZIP, double-click `install.bat`, wait,
 text the operator. `install.bat` lays down the repo, a Python venv + deps,
 Playwright's chromium, Chrome (Edge fallback), and the four Task Scheduler tasks,
 and starts the CDP Chrome.
@@ -77,7 +77,7 @@ After the user reports "Install complete":
 | `Jobscout\Chrome` | at logon | launches the CDP Chrome, stays open all day |
 | `Jobscout\Update` | hourly + at logon | `git fetch` + `git reset --hard origin/main`, re-pip on dep change |
 | `Jobscout\ApplyWorker` | every 1 min | claims one pending apply_request, fills the form |
-| `Jobscout\Discover` | daily 10:30 Berlin | LinkedIn + Indeed scrape → Supabase |
+| `Jobscout\Discover` | daily 10:30 Berlin | LinkedIn + Indeed scrape -> Supabase |
 
 ## Daily workflow (end user)
 
@@ -88,7 +88,7 @@ After the user reports "Install complete":
 ## Updates
 
 Push to `main`. Within the hour, `Jobscout\Update` resets the end-user's repo to
-`origin/main` and re-pips if `requirements.win.txt` changed. **Keep `main` green** —
+`origin/main` and re-pips if `requirements.win.txt` changed. **Keep `main` green** -
 a broken commit auto-deploys. `git reset --hard` (not `pull --ff-only`) so a
 crash/AV-dirtied tree can't silently strand the user on stale code.
 
@@ -113,8 +113,8 @@ rmdir /S /Q "%USERPROFILE%\jobscout"
 - **`update.log` fetch FAILED:** the public key isn't on the repo's Deploy Keys,
   or the private key on disk doesn't match. Re-add it.
 - **Toasts don't appear:** check `%LOCALAPPDATA%\jobscout\logs\notify.log` (fallback log).
-- **`apply-worker.bat` exits 127:** venv missing — re-run `install.bat`.
+- **`apply-worker.bat` exits 127:** venv missing - re-run `install.bat`.
 - **`apply-worker.bat` Supabase 404:** the `apply_requests` table isn't in the
   Supabase project; apply the migration via the dashboard SQL editor.
 - **Edge launched instead of Chrome:** expected if Chrome install fell back to
-  Edge — check `%LOCALAPPDATA%\jobscout\browser.txt`.
+  Edge - check `%LOCALAPPDATA%\jobscout\browser.txt`.

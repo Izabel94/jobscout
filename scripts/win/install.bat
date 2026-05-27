@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 REM Jobscout one-time bootstrap. Julian double-clicks this after extracting the ZIP.
-REM Idempotent — safe to re-run. Lays down the repo, a Python venv, Playwright's
+REM Idempotent - safe to re-run. Lays down the repo, a Python venv, Playwright's
 REM chromium, Chrome (Edge fallback), and the four Task Scheduler entries.
 REM
 REM The ZIP ships the repo with .git so no private-repo clone (and no deploy key)
@@ -19,7 +19,7 @@ REM If not already elevated, relaunch this script via UAC and exit the
 REM non-elevated instance. The user clicks "Yes" once.
 net session >nul 2>&1
 if not "%errorlevel%"=="0" (
-    echo Requesting administrator access — please click "Yes" on the prompt...
+    echo Requesting administrator access - please click "Yes" on the prompt...
     powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
     exit /b
 )
@@ -33,7 +33,7 @@ set "LOG_FILE=%LOG_DIR%\install.log"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 echo ==== %DATE% %TIME% install starting ==== >> "%LOG_FILE%"
 
-call :log "Setting up jobscout. This takes a few minutes — please don't close this window."
+call :log "Setting up jobscout. This takes a few minutes - please don't close this window."
 
 REM --- 1. Lay down the repo --------------------------------------------------
 if not exist "%JOBSCOUT_REPO%\.git" (
@@ -98,7 +98,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath('Desktop'),'Jobscout Dashboard.url'));$s.TargetPath='https://jobscout-julian.streamlit.app/';$s.Save()" >> "%LOG_FILE%" 2>&1
 
 call :log ""
-call :log "Install complete. Please text Izabel — she'll finish the setup remotely."
+call :log "Install complete. Please text Izabel - she'll finish the setup remotely."
 echo %DATE% %TIME% install done >> "%LOG_FILE%"
 echo.
 pause
@@ -111,16 +111,16 @@ echo %DATE% %TIME% %~1 >> "%LOG_FILE%"
 exit /b 0
 
 :pip_retry
-REM pip install with 3 retries — chromium/wheel downloads can blip on flaky wifi.
+REM pip install with 3 retries - chromium/wheel downloads can blip on flaky wifi.
 set /a _try=0
 :pip_loop
 set /a _try+=1
 "%PYTHON%" -m pip install -r "%JOBSCOUT_REPO%\requirements.win.txt" >> "%LOG_FILE%" 2>&1
 if not errorlevel 1 exit /b 0
 if %_try% GEQ 3 (
-    call :log "Dependency install failed after 3 tries — check wifi, then re-run install."
+    call :log "Dependency install failed after 3 tries - check wifi, then re-run install."
     exit /b 1
 )
-call :log "Dependency install hiccup — retrying (%_try%/3)..."
+call :log "Dependency install hiccup - retrying (%_try%/3)..."
 timeout /t 5 /nobreak >nul
 goto :pip_loop
