@@ -1,0 +1,30 @@
+# Windows worker requirements — full local runtime for Julian's laptop
+# (apply worker + discovery). Distinct from requirements.txt, which is the
+# minimal Streamlit-Cloud subset. Installed into %USERPROFILE%\jobscout\.venv
+# by scripts/win/install.bat; refreshed by scripts/win/update.bat when this
+# file's hash changes.
+#
+# Keep in sync with the [project.dependencies] array in pyproject.toml.
+
+pydantic>=2.9,<3.0
+python-dotenv>=1.0,<2.0
+supabase>=2.9,<3.0
+anthropic>=0.40,<0.41
+feedparser>=6.0,<7.0
+beautifulsoup4>=4.12,<5.0
+lxml>=5.3,<6.0
+httpx>=0.27,<0.28
+pyyaml>=6.0,<7.0
+jinja2>=3.1,<4.0
+markdown>=3.7,<4.0
+streamlit>=1.40,<2.0
+python-jobspy>=1.1,<2.0
+lingua-language-detector>=2.0,<3.0
+sentence-transformers>=3.3,<4.0
+google-genai>=1.0,<2.0
+playwright>=1.59.0,<2.0.0
+playwright-stealth>=2.0.3,<3.0.0
+notify-py>=0.3,<0.4
+pypdf>=4.0,<5.0
+streamlit-shadcn-ui>=0.1,<0.3
+markdownify>=0.13.1,<0.14.0

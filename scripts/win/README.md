@@ -1,116 +1,120 @@
-# Jobscout on Windows — operator install runbook
+# Jobscout on Windows — operator runbook
 
-This is the **manual** Windows install path. The Briefcase MSI installer is a
-Phase 5b follow-up; for now the operator runs these steps once on the end-user
-laptop.
+Phase 5b ships a one-time ZIP bootstrap. The operator builds it on her Windows
+laptop, drops it in Syncthing, and the end user double-clicks `install.bat`.
+After that, code updates flow automatically via the hourly `Jobscout\Update`
+task — no re-ship, no re-install.
 
-## Prerequisites
+Architecture: discovery + apply both run **locally on the end-user laptop**, the
+same 5-min-poll model sidegig uses on the operator's Mac (here: 1-min poll). The
+Streamlit dashboard runs on Streamlit Cloud and is reached from any browser.
 
-- Windows 10/11.
-- Google Chrome installed (or Microsoft Edge, which is preinstalled).
-- Python 3.13 (install from python.org or the Microsoft Store).
-- Git for Windows.
+## One-time operator setup (before first build)
 
-## Install
-
-1. Clone the repo to the user's home directory:
+1. **Generate a read-only deploy key** for the repo:
 
    ```cmd
-   cd %USERPROFILE%
-   git clone <repo-url> jobscout
-   cd jobscout
+   ssh-keygen -t ed25519 -f jobscout_deploy -N "" -C "jobscout-deploy"
    ```
 
-2. Install Poetry and the project deps:
+   Add `jobscout_deploy.pub` to the repo's **Settings → Deploy keys** (read-only,
+   do NOT check "Allow write access"). Keep `jobscout_deploy` (private) safe — it
+   goes on the end-user machine later. Deploy keys are single-repo scoped and
+   don't expire, unlike fine-grained PATs.
 
-   ```cmd
-   pip install poetry
-   poetry install
-   ```
+## Build the package (on the operator's Windows laptop)
 
-3. Create `%USERPROFILE%\jobscout\.env` with the required keys:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\win\build-package.ps1
+```
+
+Produces `dist\jobscout-windows-<date>.zip` containing: the repo (with `.git`,
+origin preset to the SSH URL), a python.org user-scope installer, MinGit, and the
+bootstrap scripts. Drop the ZIP in the Syncthing folder shared with the end user.
+
+> Build must run on Windows — Python wheels (lxml, sentence-transformers,
+> playwright) are platform-specific; there is no cross-build from macOS.
+
+## End-user install (they do this)
+
+See [`INSTALL.md`](INSTALL.md) — extract ZIP, double-click `install.bat`, wait,
+text the operator. `install.bat` lays down the repo, a Python venv + deps,
+Playwright's chromium, Chrome (Edge fallback), and the four Task Scheduler tasks,
+and starts the CDP Chrome.
+
+## Operator finish (once, via RDP)
+
+After the user reports "Install complete":
+
+1. Drop the **private** deploy key at `%USERPROFILE%\.ssh\jobscout_deploy`.
+2. Paste the real secrets into `%USERPROFILE%\jobscout\.env`:
 
    ```
    SUPABASE_URL=https://<project-ref>.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=<key>
    GEMINI_API_KEY=<key>
    JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/<the-end-user>/
+   JOBSCOUT_CDP_URL=http://localhost:9222
    ```
 
-4. Sign into LinkedIn in the CDP Chrome window once so the profile persists:
+3. Smoke the four tasks and the deploy-key fetch:
 
    ```cmd
-   scripts\win\chrome-cdp.bat
-   ```
-
-   A Chrome window opens on LinkedIn. Sign in, close the window when done.
-
-5. Register the two Task Scheduler tasks (paths are absolute so they work
-   regardless of where the user installs):
-
-   ```cmd
-   schtasks /Create /TN "Jobscout\ApplyWorker" /XML "%USERPROFILE%\jobscout\scripts\win\JobscoutApplyWorker.xml" /F
-   schtasks /Create /TN "Jobscout\Discover" /XML "%USERPROFILE%\jobscout\scripts\win\JobscoutDiscover.xml" /F
-   ```
-
-   `/F` overwrites any pre-existing task with the same name (idempotent re-install).
-
-6. Verify the tasks registered:
-
-   ```cmd
+   schtasks /Query /TN "Jobscout\Chrome"
+   schtasks /Query /TN "Jobscout\Update"
    schtasks /Query /TN "Jobscout\ApplyWorker"
    schtasks /Query /TN "Jobscout\Discover"
+   schtasks /Run /TN "Jobscout\Update"
+   type "%LOCALAPPDATA%\jobscout\logs\update.log"
    ```
 
-   Both should show `Ready` status.
+   The update log should end with `OK` (proves the deploy key authenticates).
 
-7. Trigger an immediate apply-worker run to confirm clean exit:
+## The four tasks
 
-   ```cmd
-   schtasks /Run /TN "Jobscout\ApplyWorker"
-   ```
+| Task | Trigger | Does |
+|---|---|---|
+| `Jobscout\Chrome` | at logon | launches the CDP Chrome, stays open all day |
+| `Jobscout\Update` | hourly + at logon | `git fetch` + `git reset --hard origin/main`, re-pip on dep change |
+| `Jobscout\ApplyWorker` | every 1 min | claims one pending apply_request, fills the form |
+| `Jobscout\Discover` | daily 10:30 Berlin | LinkedIn + Indeed scrape → Supabase |
 
-   Wait ~10 seconds, then check the log:
+## Daily workflow (end user)
 
-   ```cmd
-   type "%LOCALAPPDATA%\jobscout\logs\apply-worker.log"
-   ```
+- CDP Chrome is already open (logon task). Open the dashboard from the desktop
+  shortcut, click Apply on listings.
+- Within ~1 min the form fills in a Chrome tab. Review, click Submit, close the tab.
 
-   Expected last lines:
-   - `CDP Chrome down; pending=0 — exiting` (if Chrome is closed), OR
-   - `worker done — processed 0 request(s)` + `OK` (if Chrome is up + no pending rows).
+## Updates
 
-## Daily workflow
-
-- Once per day, launch the CDP Chrome window: `scripts\win\chrome-cdp.bat`.
-- Open the Streamlit dashboard, click Apply on listings.
-- The Task Scheduler `Jobscout\ApplyWorker` task fires every 5 min, claims pending rows, fills the form, pauses on Submit.
-- Review what got filled in the Chrome window, click Submit yourself.
-- Close the Chrome window when done.
+Push to `main`. Within the hour, `Jobscout\Update` resets the end-user's repo to
+`origin/main` and re-pips if `requirements.win.txt` changed. **Keep `main` green** —
+a broken commit auto-deploys. `git reset --hard` (not `pull --ff-only`) so a
+crash/AV-dirtied tree can't silently strand the user on stale code.
 
 ## Uninstall
 
+Run `scripts\win\uninstall.bat` (deletes the four tasks + shortcut, prompts to
+remove program files), or manually:
+
 ```cmd
+schtasks /Delete /TN "Jobscout\Chrome" /F
+schtasks /Delete /TN "Jobscout\Update" /F
 schtasks /Delete /TN "Jobscout\ApplyWorker" /F
 schtasks /Delete /TN "Jobscout\Discover" /F
 rmdir /S /Q "%LOCALAPPDATA%\jobscout"
+rmdir /S /Q "%USERPROFILE%\jobscout"
 ```
-
-Then `rmdir /S /Q "%USERPROFILE%\jobscout"` if you want to remove the repo too.
 
 ## Troubleshooting
 
-- **Toast notifications don't appear:** the toast API isn't available when
-  the task runs under a non-interactive context. Check
-  `%LOCALAPPDATA%\jobscout\logs\notify.log` — failures are appended there as
-  a fallback.
-- **`apply-worker.bat` exits with code 127:** the venv isn't built. Re-run
-  `poetry install` from `%USERPROFILE%\jobscout`.
-- **`apply-worker.bat` exits with the Supabase 404 error:** the
-  `apply_requests` table isn't in your Supabase project. Apply the migration
-  `supabase/migrations/20260522140000_apply_requests.sql` via the dashboard
-  SQL editor.
-- **Edge is launched instead of Chrome:** `JOBSCOUT_CHROME_BIN` env var
-  wasn't set and Chrome isn't at the standard install path. Either install
-  Chrome or set `JOBSCOUT_CHROME_BIN` in the user's environment variables
-  (Control Panel → System → Advanced → Environment Variables).
+- **`update.log` shows "deploy key missing":** drop the private key at
+  `%USERPROFILE%\.ssh\jobscout_deploy` via RDP.
+- **`update.log` fetch FAILED:** the public key isn't on the repo's Deploy Keys,
+  or the private key on disk doesn't match. Re-add it.
+- **Toasts don't appear:** check `%LOCALAPPDATA%\jobscout\logs\notify.log` (fallback log).
+- **`apply-worker.bat` exits 127:** venv missing — re-run `install.bat`.
+- **`apply-worker.bat` Supabase 404:** the `apply_requests` table isn't in the
+  Supabase project; apply the migration via the dashboard SQL editor.
+- **Edge launched instead of Chrome:** expected if Chrome install fell back to
+  Edge — check `%LOCALAPPDATA%\jobscout\browser.txt`.

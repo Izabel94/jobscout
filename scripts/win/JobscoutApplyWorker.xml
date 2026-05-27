@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>jobscout apply-worker — runs every 5 minutes, processes one pending apply_request row at a time against the user's CDP Chrome.</Description>
+    <Description>jobscout apply-worker — runs every minute, processes one pending apply_request row at a time against the user's CDP Chrome. IgnoreNew prevents overlap while a previous run waits for the human to submit.</Description>
     <URI>\Jobscout\ApplyWorker</URI>
   </RegistrationInfo>
   <Triggers>
     <TimeTrigger>
       <Repetition>
-        <Interval>PT5M</Interval>
+        <Interval>PT1M</Interval>
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
       <StartBoundary>2026-05-22T08:00:00</StartBoundary>

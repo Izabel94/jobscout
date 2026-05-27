@@ -142,11 +142,15 @@ Requires a sample CV PDF at `/tmp/jobscout-smoke-cv.pdf`. Inspect the filled fie
 
 ## Apply pipeline (Windows runtime)
 
-The end-user runs jobscout on Windows. The Task Scheduler firmware mirrors
-the Mac launchd setup — `apply-worker.bat` runs every 5 min, `discover.bat`
-runs daily at 10:30 local time.
+The end-user runs jobscout's backend (discovery + apply worker + CDP Chrome)
+locally on Windows; the dashboard runs on Streamlit Cloud. Four Task Scheduler
+tasks: `Chrome` (at logon), `ApplyWorker` (every 1 min), `Discover` (daily 10:30
+Berlin), and `Update` (hourly `git fetch` + `reset --hard`, so code pushed to
+`main` auto-deploys without a re-install).
 
-See [`scripts/win/README.md`](scripts/win/README.md) for the operator install
-runbook (clone → `poetry install` → `schtasks /Create /XML`).
+Distribution is a one-time ZIP bootstrap (`install.bat`), not an MSI — Briefcase
+was a poor fit for a Streamlit+Playwright payload and unsigned MSIs trip
+SmartScreen regardless; a ZIP delivered via Syncthing/USB avoids that.
 
-Briefcase MSI installer is deferred to Phase 5b.
+See [`scripts/win/README.md`](scripts/win/README.md) for the operator runbook
+(deploy key → `build-package.ps1` → Syncthing → RDP secret paste).
