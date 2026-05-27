@@ -78,6 +78,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
         run: poetry run python -m jobscout.filter
 
   score:
@@ -99,6 +100,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
         run: poetry run python -m jobscout.score
 
       # Print a digest of new high-scoring listings to the GHA log. No
