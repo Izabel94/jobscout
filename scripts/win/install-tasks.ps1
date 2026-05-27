@@ -20,7 +20,11 @@ foreach ($t in $tasks) {
     $xmlPath = Join-Path $dir $t.Xml
     if (-not (Test-Path $xmlPath)) { throw "missing task XML: $xmlPath" }
     Write-Host "Registering Jobscout\$($t.Leaf) from $($t.Xml)"
-    $xml = Get-Content -Path $xmlPath -Raw
+    # Strip the <?xml ... encoding="UTF-8" ?> declaration: PowerShell hands the
+    # file to the Task Scheduler parser as a UTF-16 in-memory string, and the
+    # declared UTF-8 makes it fail with "unable to switch the encoding" at the
+    # encoding attribute. The parser is happy without a declaration.
+    $xml = (Get-Content -Path $xmlPath -Raw) -replace '(?s)^\s*<\?xml.*?\?>\s*', ''
     Register-ScheduledTask -TaskName $t.Leaf -TaskPath "\Jobscout\" -Xml $xml -Force | Out-Null
 }
 
