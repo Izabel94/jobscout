@@ -27,7 +27,7 @@ if ($chromeExe) {
 
 $msi = Join-Path $env:TEMP "GoogleChromeEnterprise64.msi"
 try {
-    Write-Host "Chrome not found — downloading Enterprise MSI..."
+    Write-Host "Chrome not found - downloading Enterprise MSI..."
     Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/GoogleChromeStandaloneEnterprise64.msi" `
         -OutFile $msi -UseBasicParsing
     $rc = (Start-Process msiexec -ArgumentList "/i `"$msi`" /quiet /norestart NOGOOGLEUPDATESERVICE=1" -Wait -PassThru).ExitCode
@@ -35,7 +35,7 @@ try {
     Set-Content -Path $browserFile -Value "chrome"
     Write-Host "Chrome installed."
 } catch {
-    Write-Warning "Chrome install failed: $_ — falling back to Edge"
+    Write-Warning "Chrome install failed: $_ - falling back to Edge"
     Set-Content -Path $browserFile -Value "msedge"
 } finally {
     if (Test-Path $msi) { Remove-Item $msi -Force -ErrorAction SilentlyContinue }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>jobscout discover — daily LinkedIn + Indeed scrape, writes new listings to Supabase. Runs at 10:30 local time (Berlin TZ on the end-user machine).</Description>
+    <Description>jobscout discover - daily LinkedIn + Indeed scrape, writes new listings to Supabase. Runs at 10:30 local time (Berlin TZ on the end-user machine).</Description>
     <URI>\Jobscout\Discover</URI>
   </RegistrationInfo>
   <Triggers>

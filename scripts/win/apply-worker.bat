@@ -19,10 +19,10 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 echo. >> "%LOG_FILE%"
 echo ==== %DATE% %TIME% apply-worker starting ==== >> "%LOG_FILE%"
 
-REM Fail loud if the venv is missing, regardless of CDP state — otherwise the
+REM Fail loud if the venv is missing, regardless of CDP state - otherwise the
 REM CDP-down branch would silently exit 0 with no signal to the user.
 if not exist "%PYTHON%" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\notify-toast.ps1" -Title "jobscout apply-worker" -Body "venv missing: %PYTHON% — run `poetry install`"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\notify-toast.ps1" -Title "jobscout apply-worker" -Body "venv missing: %PYTHON% - run `poetry install`"
     echo %DATE% %TIME% venv missing: %PYTHON% >> "%LOG_FILE%"
     exit /b 127
 )
@@ -39,7 +39,7 @@ if "%CDP_UP%"=="0" (
     if !PENDING! GTR 0 (
         powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\notify-toast.ps1" -Title "jobscout: !PENDING! apply request(s) waiting" -Body "Start Chrome via scripts\win\chrome-cdp.bat"
     )
-    echo %DATE% %TIME% CDP Chrome down; pending=!PENDING! — exiting >> "%LOG_FILE%"
+    echo %DATE% %TIME% CDP Chrome down; pending=!PENDING! - exiting >> "%LOG_FILE%"
     exit /b 0
 )
 

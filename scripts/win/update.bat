@@ -28,11 +28,11 @@ echo. >> "%LOG_FILE%"
 echo ==== %DATE% %TIME% update starting ==== >> "%LOG_FILE%"
 
 if not exist "%GIT%" (
-    echo %DATE% %TIME% MinGit missing at %GIT% — bootstrap incomplete >> "%LOG_FILE%"
+    echo %DATE% %TIME% MinGit missing at %GIT% - bootstrap incomplete >> "%LOG_FILE%"
     exit /b 127
 )
 if not exist "%SSH_KEY%" (
-    echo %DATE% %TIME% deploy key missing at %SSH_KEY% — operator must drop it via RDP >> "%LOG_FILE%"
+    echo %DATE% %TIME% deploy key missing at %SSH_KEY% - operator must drop it via RDP >> "%LOG_FILE%"
     exit /b 1
 )
 
@@ -61,7 +61,7 @@ set "LASTHASH="
 if exist "%HASH_FILE%" set /p LASTHASH=<"%HASH_FILE%"
 
 if not "%REQHASH%"=="%LASTHASH%" (
-    echo %DATE% %TIME% requirements.win.txt changed — reinstalling deps >> "%LOG_FILE%"
+    echo %DATE% %TIME% requirements.win.txt changed - reinstalling deps >> "%LOG_FILE%"
     "%PYTHON%" -m pip install -r "%JOBSCOUT_REPO%\requirements.win.txt" >> "%LOG_FILE%" 2>&1
     if errorlevel 1 (
         echo %DATE% %TIME% pip install FAILED >> "%LOG_FILE%"

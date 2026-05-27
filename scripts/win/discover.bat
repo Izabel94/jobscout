@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-REM Daily discovery — scrapes LinkedIn + Indeed, writes new listings to Supabase.
+REM Daily discovery - scrapes LinkedIn + Indeed, writes new listings to Supabase.
 REM Triggered by Task Scheduler at 10:30 Berlin time (see JobscoutDiscover.xml).
 
 if "%JOBSCOUT_REPO%"=="" set JOBSCOUT_REPO=%USERPROFILE%\jobscout
@@ -17,7 +17,7 @@ echo. >> "%LOG_FILE%"
 echo ==== %DATE% %TIME% discover starting ==== >> "%LOG_FILE%"
 
 if not exist "%PYTHON%" (
-    echo venv missing: %PYTHON% — run `poetry install` >> "%LOG_FILE%"
+    echo venv missing: %PYTHON% - run `poetry install` >> "%LOG_FILE%"
     exit /b 127
 )
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>jobscout Chrome — launches the CDP-attached Chrome (Edge fallback) at user logon so the apply worker always has a browser to attach to. Stays open all day.</Description>
+    <Description>jobscout Chrome - launches the CDP-attached Chrome (Edge fallback) at user logon so the apply worker always has a browser to attach to. Stays open all day.</Description>
     <URI>\Jobscout\Chrome</URI>
   </RegistrationInfo>
   <Triggers>

@@ -47,7 +47,7 @@ git clone "$repoRoot" "$repoStage" | Out-Null
 git -C $repoStage remote set-url origin $SshRemote
 # The local clone already carries origin/main + branch tracking; no network
 # fetch needed here. update.bat does the GitHub fetch on the target machine
-# (with the deploy key + accept-new host key) — that's where SSH first runs.
+# (with the deploy key + accept-new host key) - that's where SSH first runs.
 
 # --- 4. Stage vendor files + bootstrap entry at ZIP root -------------------
 Copy-Item $pyExe     (Join-Path $staging "python-3.13-amd64.exe")
