@@ -44,7 +44,8 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>%USERPROFILE%\jobscout\scripts\win\update.bat</Command>
+      <Command>wscript.exe</Command>
+      <Arguments>"%USERPROFILE%\jobscout\scripts\win\run-hidden.vbs" "%USERPROFILE%\jobscout\scripts\win\update.bat"</Arguments>
       <WorkingDirectory>%USERPROFILE%\jobscout</WorkingDirectory>
     </Exec>
   </Actions>

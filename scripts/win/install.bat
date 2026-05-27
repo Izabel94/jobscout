@@ -14,6 +14,16 @@ REM   jobscout-repo\           full repo clone (origin remote = SSH URL)
 REM   python-3.13-amd64.exe    python.org user-scope installer
 REM   MinGit.zip               portable git for the updater
 
+REM Self-elevate: registering the Task Scheduler entries needs administrator.
+REM If not already elevated, relaunch this script via UAC and exit the
+REM non-elevated instance. The user clicks "Yes" once.
+net session >nul 2>&1
+if not "%errorlevel%"=="0" (
+    echo Requesting administrator access — please click "Yes" on the prompt...
+    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
 set "HERE=%~dp0"
 set "JOBSCOUT_REPO=%USERPROFILE%\jobscout"
 set "STATE_DIR=%LOCALAPPDATA%\jobscout"
