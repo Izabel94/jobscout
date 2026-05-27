@@ -14,6 +14,20 @@ REM Close the browser window when done.
 if "%PORT%"=="" set PORT=9222
 if "%PROFILE_DIR%"=="" set PROFILE_DIR=%LOCALAPPDATA%\jobscout\chrome-cdp
 
+REM Honor the browser chosen at install time (install-chrome.ps1 writes "chrome"
+REM or "msedge" here when Chrome install fell back to Edge).
+set "BROWSER_FILE=%LOCALAPPDATA%\jobscout\browser.txt"
+if "%JOBSCOUT_CHROME_BIN%"=="" if exist "%BROWSER_FILE%" (
+    set /p CHOSEN_BROWSER=<"%BROWSER_FILE%"
+    if "!CHOSEN_BROWSER!"=="msedge" (
+        if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+            set "JOBSCOUT_CHROME_BIN=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+        ) else if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+            set "JOBSCOUT_CHROME_BIN=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+        )
+    )
+)
+
 if "%JOBSCOUT_CHROME_BIN%"=="" (
     if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
         set "JOBSCOUT_CHROME_BIN=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
