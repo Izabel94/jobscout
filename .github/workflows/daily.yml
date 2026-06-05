@@ -108,6 +108,16 @@ jobs:
           JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
         run: poetry run python -m jobscout.score
 
+      - name: Run draft
+        env:
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
+        run: poetry run python -m jobscout.draft
+
       # Print a digest of new high-scoring listings to the GHA log. No
       # email — user opted out. The digest script is still useful locally
       # (e.g. `make digest` would read from cloud Supabase).
