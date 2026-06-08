@@ -3,7 +3,7 @@
   "arrangement_evidence": "hybrid",
   "expected_job_type": "parttime",
   "job_type_evidence": "jobspy.job_type='parttime'",
-  "expected_apply_method": "easy_apply",
+  "expected_apply_method": "external_apply",
   "labeler": "regex-heuristic",
   "verified_by_operator": false
 }
