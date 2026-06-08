@@ -14,7 +14,9 @@
 
 set -euo pipefail
 
-PORT="${PORT:-9222}"
+# 9223, not 9222 — sidegig's CDP Chrome owns 9222. Distinct ports keep the
+# two apps' workers from attaching to (and hijacking) each other's browser.
+PORT="${PORT:-9223}"
 PROFILE_DIR="${PROFILE_DIR:-$HOME/.cache/jobscout/chrome-cdp}"
 JOBSCOUT_CHROME_BIN="${JOBSCOUT_CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 

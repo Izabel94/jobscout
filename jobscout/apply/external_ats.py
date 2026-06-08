@@ -530,7 +530,7 @@ def apply(
         print(
             "JOBSCOUT_CDP_URL not set. Launch the CDP Chrome first:\n"
             "    bash scripts/chrome-cdp.sh\n"
-            "then re-run with JOBSCOUT_CDP_URL=http://localhost:9222",
+            "then re-run with JOBSCOUT_CDP_URL=http://localhost:9223",
             flush=True,
         )
         sys.exit(2)

@@ -6,12 +6,12 @@ REM so jobscout scripts (bootstrap, apply worker) can attach via CDP.
 REM
 REM Usage:
 REM   scripts\win\chrome-cdp.bat                              REM launch
-REM   set JOBSCOUT_CDP_URL=http://localhost:9222
+REM   set JOBSCOUT_CDP_URL=http://localhost:9223
 REM   set JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/...
 REM
 REM Close the browser window when done.
 
-if "%PORT%"=="" set PORT=9222
+if "%PORT%"=="" set PORT=9223
 if "%PROFILE_DIR%"=="" set PROFILE_DIR=%LOCALAPPDATA%\jobscout\chrome-cdp
 
 REM Honor the browser chosen at install time (install-chrome.ps1 writes "chrome"

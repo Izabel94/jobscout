@@ -17,7 +17,9 @@ set -uo pipefail
 REPO_DIR="${JOBSCOUT_REPO:-$HOME/projects/jobscout}"
 LOG_DIR="$HOME/.cache/jobscout/launchd"
 LOG_FILE="$LOG_DIR/apply-worker.log"
-CDP_PORT="${CDP_PORT:-9222}"
+# 9223, not 9222 — sidegig owns 9222. Distinct ports stop the two apps'
+# workers from attaching to each other's CDP Chrome.
+CDP_PORT="${CDP_PORT:-9223}"
 
 # In-project venv; survives branch switches because .venv is gitignored.
 PYTHON="$REPO_DIR/.venv/bin/python"
