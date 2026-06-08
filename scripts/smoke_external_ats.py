@@ -2,7 +2,7 @@
 
 Prereqs:
   bash scripts/chrome-cdp.sh                 # window 1
-  export JOBSCOUT_CDP_URL=http://localhost:9222
+  export JOBSCOUT_CDP_URL=http://localhost:9223
   export JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/julian-engelke-449211209/
 
 Then in window 2:

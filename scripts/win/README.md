@@ -54,7 +54,7 @@ After the user reports "Install complete":
    SUPABASE_SERVICE_ROLE_KEY=<key>
    GEMINI_API_KEY=<key>
    JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/<the-end-user>/
-   JOBSCOUT_CDP_URL=http://localhost:9222
+   JOBSCOUT_CDP_URL=http://localhost:9223
    ```
 
 3. Smoke the four tasks and the deploy-key fetch:

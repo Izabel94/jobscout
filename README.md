@@ -102,7 +102,7 @@ one-click apply.
 Set these in `.env` (or the operator's shell):
 
 ```bash
-JOBSCOUT_CDP_URL=http://localhost:9222
+JOBSCOUT_CDP_URL=http://localhost:9223
 JOBSCOUT_PROFILE_LINKEDIN_URL=https://www.linkedin.com/in/<the-end-user>/
 JOBSCOUT_CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome   # optional, defaults to this
 ```

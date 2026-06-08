@@ -25,7 +25,7 @@ import re
 from jobscout.db import upsert_profile
 from jobscout.llm import call_text
 
-CDP_URL = os.environ.get("JOBSCOUT_CDP_URL", "http://localhost:9222")
+CDP_URL = os.environ.get("JOBSCOUT_CDP_URL", "http://localhost:9223")
 
 EXTRACT_PROMPT = """Below is the visible text of a LinkedIn profile page.
 Extract the candidate's information as JSON matching this schema. Return

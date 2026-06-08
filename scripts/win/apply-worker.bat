@@ -3,11 +3,11 @@ setlocal EnableDelayedExpansion
 
 REM Apply-queue worker for Windows Task Scheduler.
 REM Triggered every 5 minutes (see JobscoutApplyWorker.xml).
-REM Probes CDP Chrome on port 9222; if down + nothing pending, exits silently.
+REM Probes CDP Chrome on port 9223; if down + nothing pending, exits silently.
 REM If down + something pending, surfaces a toast so the user knows to launch Chrome.
 
 if "%JOBSCOUT_REPO%"=="" set JOBSCOUT_REPO=%USERPROFILE%\jobscout
-if "%CDP_PORT%"=="" set CDP_PORT=9222
+if "%CDP_PORT%"=="" set CDP_PORT=9223
 set "LOG_DIR=%LOCALAPPDATA%\jobscout\logs"
 set "LOG_FILE=%LOG_DIR%\apply-worker.log"
 
