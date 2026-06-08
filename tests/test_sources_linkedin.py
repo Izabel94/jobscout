@@ -82,8 +82,9 @@ def test_linkedin_source_populates_derived_fields(monkeypatch):
         assert listing.apply_method in (ApplyMethod.EASY_APPLY, ApplyMethod.EXTERNAL_APPLY), listing.url
         assert listing.arrangement in tuple(Arrangement), listing.url
         assert listing.job_type_classified in tuple(JobType), listing.url
-    # All LinkedIn listings are easy_apply (per the empirical finding)
-    assert all(listing.apply_method == ApplyMethod.EASY_APPLY for listing in listings)
+    # LinkedIn is classified optimistic EXTERNAL_APPLY (worker demotes true
+    # Easy Apply to easy_apply at click time).
+    assert all(listing.apply_method == ApplyMethod.EXTERNAL_APPLY for listing in listings)
 
 
 def test_linkedin_source_attaches_evidence_strings(monkeypatch):

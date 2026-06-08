@@ -150,11 +150,15 @@ def classify_job_type(raw: dict[str, Any]) -> tuple[JobType, str]:
 
 
 def classify_apply_method(source: str, raw: dict[str, Any]) -> tuple[ApplyMethod, str]:
-    """LinkedIn: hardcoded EASY_APPLY (company_url_direct empirically empty
-    in 100% of logged-out corpus). Indeed: EXTERNAL_APPLY iff
-    company_url_direct is present."""
+    """LinkedIn: optimistic EXTERNAL_APPLY. JobSpy can't tell offsite-apply
+    from Easy Apply at scrape time (job_url_direct/company_url_direct are empty
+    for LinkedIn), but many LinkedIn jobs are offsite ("Auf Firmenwebseite
+    bewerben" → external portal) and ARE auto-fillable. We attempt them; the
+    apply worker detects true Easy Apply at click (lands on
+    linkedin.com/jobs/easyApply/*) and demotes the listing to EASY_APPLY.
+    Indeed: EXTERNAL_APPLY iff company_url_direct is present."""
     if source == "linkedin":
-        return ApplyMethod.EASY_APPLY, "linkedin always easy_apply (company_url_direct empirically empty)"
+        return ApplyMethod.EXTERNAL_APPLY, "linkedin optimistic external_apply (demoted at click if Easy Apply)"
     url = _str(raw.get("company_url_direct")).strip()
     if url:
         return ApplyMethod.EXTERNAL_APPLY, url

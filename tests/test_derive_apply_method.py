@@ -42,14 +42,15 @@ def test_classifier_apply_method_against_fixtures():
     assert accuracy >= 0.95, msg
 
 
-def test_linkedin_always_easy_apply():
-    """Empirical finding: company_url_direct is null in 100% of LinkedIn
-    corpus from logged-out residential scraping. LinkedIn → easy_apply
-    unconditionally."""
+def test_linkedin_optimistic_external_apply():
+    """LinkedIn is classified EXTERNAL_APPLY optimistically: JobSpy can't tell
+    offsite-apply from Easy Apply at scrape time (the *_url_direct fields are
+    empty for LinkedIn), but many LinkedIn jobs are offsite and auto-fillable.
+    The apply worker demotes true Easy Apply to easy_apply at click time."""
     actual, _ = classify_apply_method("linkedin", {"company_url_direct": "https://greenhouse.io/foo"})
-    assert actual == ApplyMethod.EASY_APPLY
+    assert actual == ApplyMethod.EXTERNAL_APPLY
     actual, _ = classify_apply_method("linkedin", {})
-    assert actual == ApplyMethod.EASY_APPLY
+    assert actual == ApplyMethod.EXTERNAL_APPLY
 
 
 def test_indeed_uses_company_url_direct():

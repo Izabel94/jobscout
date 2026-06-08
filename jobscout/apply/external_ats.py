@@ -20,7 +20,7 @@ import random
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -49,7 +49,23 @@ def _assert_not_easy_apply(page: Page) -> None:
 _PAGE_THINK_SECONDS = (10.0, 18.0)
 _FIELD_THINK_SECONDS = (0.6, 1.8)
 _INTER_ROUND_WAIT_MS = 1_500
-_MAX_ROUNDS = 3
+_MAX_ROUNDS = 5
+_MAX_PAGE_ADVANCES = 3
+
+# Apply order within a round: selects/checks first (a phone-country dropdown
+# must be set before the number is typed, else an intl-tel field resets to the
+# dial code), then type/paste, then attach (a CV upload often re-renders and
+# clears prior fills), skip last.
+_ACTION_PRIORITY = {"select": 0, "check": 0, "uncheck": 0, "type": 1, "paste": 1, "attach": 2, "skip": 3}
+
+# Buttons safe to click to reach the next page of a multi-step form.
+_NEXT_KEYWORDS = ("next", "continue", "weiter", "proceed", "nächste", "next step")
+# NEVER click these — final submit is always the user's, even if the text also
+# contains a _NEXT_KEYWORD (e.g. "Next: Submit").
+_NEVER_CLICK_KEYWORDS = (
+    "submit", "apply", "send", "abschicken", "absenden", "finish", "fertig",
+    "complete", "abschließen",
+)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "config" / "prompts"
 _PROMPT_PATH = _PROMPTS_DIR / "ats_form_fill.v1.md"
@@ -83,9 +99,15 @@ def _think_pause(page: Page, seconds_range: tuple[float, float], label: str) -> 
 _ENUM_JS = r"""
 () => {
   const fields = [];
-  let n = 0;
+  // Stable, monotonic ids across re-enumerations: reuse an element's existing
+  // id, and seed the counter from a window-level value so a later page's new
+  // fields get fresh ids instead of colliding with an earlier page's __ats_0..N
+  // (which would make the round loop treat them as already-seen).
+  window.__jsAtsN = window.__jsAtsN || 0;
   const mark = (el) => {
-    const id = `__ats_${n++}`;
+    let id = el.getAttribute('data-ats-id');
+    if (id) return id;
+    id = `__ats_${window.__jsAtsN++}`;
     el.setAttribute('data-ats-id', id);
     return id;
   };
@@ -349,6 +371,21 @@ def _apply_action(
             with contextlib.suppress(Exception):
                 loc.scroll_into_view_if_needed(timeout=2_000)
             loc.click()
+            input_type = ""
+            with contextlib.suppress(Exception):
+                input_type = (loc.evaluate("el => el.type || ''") or "").lower()
+            if input_type == "tel":
+                # intl-tel widgets with a separate country selector want the
+                # NATIONAL number; typing the full "+49 163…" mangles it (the
+                # widget re-prepends the dial code). fill() also gets dropped —
+                # use real keystrokes. Strip a leading "+CC " prefix.
+                phone = str(value).strip()
+                if phone.startswith("+") and " " in phone:
+                    phone = phone.split(" ", 1)[1].strip()
+                with contextlib.suppress(Exception):
+                    loc.fill("")
+                loc.press_sequentially(phone, delay=40)
+                return True, "filled (tel national keystrokes)"
             loc.fill(str(value))
             return True, "filled"
 
@@ -450,12 +487,19 @@ def _dismiss_consent_banner(page: Page) -> bool:
 
 
 def _find_apply_cta(page: Page) -> str | None:
-    """Return href of first visible Apply / Jetzt bewerben anchor or button."""
+    """Return href of the first visible Apply / Bewerben anchor.
+
+    Skips elements with long text — on LinkedIn the "similar jobs" cards are
+    `<a>` wrappers whose textContent includes an "Easy Apply" badge, which
+    would otherwise match. The real apply button has short text ("Bewerben").
+    """
     return page.evaluate(
         """(keywords) => {
           const candidates = Array.from(document.querySelectorAll('a, button, [role="button"]'));
           for (const el of candidates) {
-            const text = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase().trim();
+            const own = (el.textContent || '').trim();
+            if (own.length > 60) continue;  // skip job-card wrappers
+            const text = (own + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase().trim();
             if (!text) continue;
             const matches = keywords.some(k => text.includes(k));
             if (!matches) continue;
@@ -470,15 +514,79 @@ def _find_apply_cta(page: Page) -> str | None:
     )
 
 
+def _resolve_cta_href(href: str) -> str:
+    """Unwrap LinkedIn's `safety/go/?url=<encoded>` redirect to the real
+    destination, skipping the "you're leaving LinkedIn" interstitial. Other
+    hrefs pass through unchanged."""
+    if "linkedin.com/safety/go" not in href:
+        return href
+    parsed = urlparse(href)
+    target = parse_qs(parsed.query).get("url", [None])[0]
+    return unquote(target) if target else href
+
+
+def _looks_like_form(fields: list[dict[str, Any]]) -> bool:
+    """True when the enumerated fields look like a real application form, not
+    a listing page with a stray field or two (e.g. LinkedIn's language picker).
+    A real form has a file input, a textarea, or several fields."""
+    if any(f.get("kind") == "file" for f in fields):
+        return True
+    if any(f.get("kind") == "textarea" for f in fields):
+        return True
+    return len(fields) >= 3
+
+
+def _advance_to_next_step(page: Page) -> bool:
+    """Click a strictly-allowlisted 'next page' button to reveal the next step
+    of a multi-page form. NEVER clicks final-submit buttons — submitting is
+    always the user's action. Returns True if it advanced."""
+    marked = page.evaluate(
+        """(kw) => {
+          const isNext = t => kw.next.some(n => t.includes(n));
+          const isNever = t => kw.never.some(n => t.includes(n));
+          for (const el of document.querySelectorAll('button, [role="button"], a')) {
+            const t = (el.textContent || '').trim().toLowerCase();
+            if (!t || t.length > 25) continue;
+            if (isNever(t)) continue;        // submit/apply/etc. take precedence
+            if (!isNext(t)) continue;
+            if (el.disabled) continue;
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            if (r.width === 0 || r.height === 0 || cs.display === 'none' || cs.visibility === 'hidden') continue;
+            el.setAttribute('data-js-next', '1');
+            return true;
+          }
+          return false;
+        }""",
+        {"next": list(_NEXT_KEYWORDS), "never": list(_NEVER_CLICK_KEYWORDS)},
+    )
+    if not marked:
+        return False
+    try:
+        page.locator('[data-js-next]').first.click(timeout=4_000)
+        page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
+        return True
+    except (PlaywrightTimeoutError, Exception) as e:
+        print(f"  next-step click failed: {e}", flush=True)
+        return False
+    finally:
+        with contextlib.suppress(Exception):
+            page.evaluate(
+                "() => document.querySelectorAll('[data-js-next]')"
+                ".forEach(e => e.removeAttribute('data-js-next'))"
+            )
+
+
 def _walk_to_form(context: BrowserContext, page: Page) -> Page:
-    """Follow Apply CTAs until the page exposes form fields, up to _MAX_APPLY_HOPS."""
+    """Follow Apply CTAs until the page is an actual application form, up to
+    _MAX_APPLY_HOPS. A page with only stray fields (LinkedIn job-view) but a
+    visible Bewerben link is NOT the form — follow the link instead."""
     for hop in range(_MAX_APPLY_HOPS):
         fields = _enumerate_fields(page)
-        if fields:
-            return page
         cta_href = _find_apply_cta(page)
-        if not cta_href:
+        if _looks_like_form(fields) or not cta_href:
             return page
+        cta_href = _resolve_cta_href(cta_href)
         print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {cta_href[:90]}", flush=True)
         # Direct nav beats clicking — JS handlers often call window.open which
         # is blocked for non-trusted events.
@@ -580,6 +688,7 @@ def _run(
         seen_field_ids: set[str] = set()
         total_applied = 0
         total_actions = 0
+        advances = 0
         round_n = 0
 
         for round_n in range(1, _MAX_ROUNDS + 1):
@@ -604,6 +713,13 @@ def _run(
                     flush=True,
                 )
                 if not targets:
+                    # Nothing left on this page — try advancing to the next step
+                    # of a multi-page form (safe-allowlisted; never submits).
+                    if advances < _MAX_PAGE_ADVANCES and _advance_to_next_step(page):
+                        advances += 1
+                        print(f"  advanced to next step (#{advances})", flush=True)
+                        _assert_not_easy_apply(page)  # a step may route to Easy Apply
+                        continue
                     break
 
             try:
@@ -620,6 +736,8 @@ def _run(
 
             seen_field_ids.update(str(f["id"]) for f in targets if f.get("id"))
             total_actions += len(actions)
+            # Selects before types before attach (phone-country before number; CV last).
+            actions.sort(key=lambda a: _ACTION_PRIORITY.get((a.get("action") or "").lower(), 1))
 
             print(f"Round {round_n}: LLM produced {len(actions)} action(s)", flush=True)
             for action in actions:
