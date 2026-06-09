@@ -103,6 +103,52 @@ def listing_hash(listing: Listing) -> str:
     return hashlib.sha1(((listing.description or "")[:500]).encode("utf-8")).hexdigest()
 
 
+def _norm(s: str | None) -> str:
+    return " ".join((s or "").lower().split())
+
+
+def _company(listing: Listing) -> str:
+    raw = listing.raw or {}
+    return str(raw.get("company") or "") if isinstance(raw, dict) else ""
+
+
+def is_media_agency(listing: Listing) -> bool:
+    """True when the company name matches a known media agency or a generic
+    agency tell. Company name only — a role mentioning agencies isn't dropped."""
+    rules = load_spam_rules()
+    company = _norm(_company(listing))
+    if not company:
+        return False
+    if any(_norm(a) in company for a in rules.get("media_agencies", [])):
+        return True
+    return any(kw.lower() in company for kw in rules.get("media_agency_company_keywords", []))
+
+
+def media_agency_ids(listings: list[Listing]) -> list[str]:
+    return [str(listing.id) for listing in listings if listing.id and is_media_agency(listing)]
+
+
+def duplicate_ids(listings: list[Listing]) -> list[str]:
+    """Ids to reject so each (title, company) keeps one row. Indeed re-scrapes
+    the same posting under different source_ids across runs, slipping past the
+    (source, source_id) constraint. Keep the richest copy (longest description,
+    then earliest discovered); reject the rest. Rows missing a title or company
+    are never grouped."""
+    groups: dict[tuple[str, str], list[Listing]] = {}
+    for listing in listings:
+        key = (_norm(listing.title), _norm(_company(listing)))
+        if not key[0] or not key[1]:
+            continue
+        groups.setdefault(key, []).append(listing)
+    reject: list[str] = []
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda listing: (-len(listing.description or ""), listing.discovered_at))
+        reject.extend(str(listing.id) for listing in group[1:] if listing.id)
+    return reject
+
+
 def pass_skill_match(listing: Listing) -> bool:
     profile = load_profile()
     text = f"{listing.title}\n{listing.description or ''}".lower()
