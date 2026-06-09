@@ -250,14 +250,22 @@ def render(listing: dict[str, Any]) -> None:
                     st.link_button("Apply manually on site ↗", url=apply_url)
                     st.caption("This site needs a login (e.g. Instaffo) — auto-fill isn't possible.")
                 elif am == ApplyMethod.EXTERNAL_APPLY:
-                    if st.button("Apply", key=f"apply-{listing.get('id', '')}", type="primary"):
+                    queued_key = f"queued-{listing.get('id', '')}"
+                    if st.session_state.get(queued_key):
+                        st.info(
+                            "⏳ Queued — a Chrome window will open within ~5 min to fill this "
+                            "application. Review it, then click Submit yourself. "
+                            "(Keep your apply Chrome running.)"
+                        )
+                    elif st.button("Apply", key=f"apply-{listing.get('id', '')}", type="primary"):
                         if listing.get("id"):
                             insert_apply_request(
                                 listing_id=listing["id"],
                                 source=listing.get("source") or "",
                             )
+                            st.session_state[queued_key] = True
                             st.toast(
-                                "Apply queued — the worker will pick it up within a minute.",
+                                "Apply queued ✅ — a Chrome window will open within ~5 min to fill it.",
                                 icon="✅",
                             )
                             st.rerun()
