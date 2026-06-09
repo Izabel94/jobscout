@@ -244,6 +244,25 @@ def test_not_fillable_flags_listing_for_manual(monkeypatch):
     assert spy.get("manual_required") == ("req-1", "login_wall")
 
 
+@pytest.mark.parametrize("over", [{"status": "rejected"}, {"apply_block_reason": "login_wall"}])
+def test_process_one_skips_rejected_or_blocked_listing(monkeypatch, over):
+    """A request queued before a filter pass must not apply once its listing was
+    rejected (agency/dupe) or flagged unfillable."""
+    from jobscout.apply import worker
+
+    monkeypatch.setattr(worker, "_fetch_listing", lambda _id: _listing(**over))
+    fired: list = []
+    monkeypatch.setattr("jobscout.apply.external_ats.apply", lambda **kw: fired.append(kw))
+    failed: list = []
+    monkeypatch.setattr(worker, "mark_apply_request_failed",
+                        lambda rid, *, error, notes=None: failed.append((rid, error)))
+
+    worker.process_one({"id": "r1", "listing_id": "l1", "source": "linkedin"})
+
+    assert fired == []
+    assert failed == [("r1", "listing_no_longer_eligible")]
+
+
 def test_main_loop_stops_at_daily_cap(monkeypatch):
     from jobscout.apply import worker
 

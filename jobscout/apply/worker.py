@@ -163,6 +163,12 @@ def process_one(row: dict[str, Any]) -> None:
         listing = _fetch_listing(row["listing_id"])
         if listing is None:
             raise RuntimeError(f"listing {row['listing_id']} not found")
+        # A request queued before a later filter pass can outlive its listing:
+        # if the listing was since rejected (agency/dupe) or flagged unfillable,
+        # don't apply — drop the stale request.
+        if listing.get("status") == "rejected" or listing.get("apply_block_reason"):
+            mark_apply_request_failed(request_id, error="listing_no_longer_eligible", notes=None)
+            return
         if listing.get("apply_method") != "external_apply":
             mark_apply_request_failed(request_id, error="easy_apply_after_claim", notes=None)
             return
