@@ -3,9 +3,11 @@
 import logging
 
 from jobscout.config_loader import load_spam_rules
-from jobscout.db import list_by_status, update_listing_status
+from jobscout.db import list_pipeline_listings_legacy, update_listing_status
 from jobscout.filters import (
+    duplicate_ids,
     has_hard_drop_pattern,
+    media_agency_ids,
     pass_embedding,
     pass_skill_match,
     pass_structural,
@@ -17,9 +19,24 @@ from jobscout.models import Listing, ListingStatus
 log = logging.getLogger("filter")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+_ACTIVE_STATUSES = [ListingStatus.NEW, ListingStatus.SCORED, ListingStatus.DRAFTED]
+
+
+def _prepass_reject_agencies_and_dupes() -> None:
+    """Reject media-agency listings and cross-run duplicates across all active
+    listings — not just new ones — so rows already in the UI get cleaned too.
+    Runs before the per-listing hard filters."""
+    active = [Listing.model_validate(r) for r in list_pipeline_listings_legacy(_ACTIVE_STATUSES, limit=10_000)]
+    agency_set = set(media_agency_ids(active))
+    dupes = set(duplicate_ids([listing for listing in active if str(listing.id) not in agency_set]))
+    for listing_id in agency_set | dupes:
+        update_listing_status(listing_id, ListingStatus.REJECTED)
+    log.info("prepass: rejected %d media-agency, %d duplicate listing(s)", len(agency_set), len(dupes))
+
 
 def main() -> None:
-    rows = list_by_status(ListingStatus.NEW)
+    _prepass_reject_agencies_and_dupes()
+    rows = list_pipeline_listings_legacy([ListingStatus.NEW], limit=10_000)
     log.info("filtering %d new listings", len(rows))
     threshold = load_spam_rules()["spam_score_drop_threshold"]
     for row in rows:
