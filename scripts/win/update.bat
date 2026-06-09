@@ -71,5 +71,24 @@ if not "%REQHASH%"=="%LASTHASH%" (
     > "%HASH_FILE%" echo %REQHASH%
 )
 
+REM Re-register the scheduled tasks when their XML defs change (new task, or a
+REM changed interval/timeout). Needs the elevated Update task (HighestAvailable);
+REM Register-ScheduledTask -Force is idempotent. Detect change via the joined
+REM SHA256 of the task XMLs.
+set "TASKHASH_FILE=%STATE_DIR%\taskhash.txt"
+set "TASKHASH="
+for /f "delims=" %%H in ('powershell -NoProfile -Command "(Get-ChildItem '%JOBSCOUT_REPO%\scripts\win\Jobscout*.xml' ^| Sort-Object Name ^| Get-FileHash -Algorithm SHA256).Hash -join ','"') do set "TASKHASH=%%H"
+set "LASTTASKHASH="
+if exist "%TASKHASH_FILE%" set /p LASTTASKHASH=<"%TASKHASH_FILE%"
+if not "%TASKHASH%"=="%LASTTASKHASH%" (
+    echo %DATE% %TIME% task XMLs changed - re-registering scheduled tasks >> "%LOG_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\install-tasks.ps1" >> "%LOG_FILE%" 2>&1
+    if errorlevel 1 (
+        echo %DATE% %TIME% task re-registration FAILED ^(needs elevation^) >> "%LOG_FILE%"
+    ) else (
+        > "%TASKHASH_FILE%" echo %TASKHASH%
+    )
+)
+
 popd
 echo %DATE% %TIME% OK >> "%LOG_FILE%"
