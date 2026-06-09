@@ -253,7 +253,7 @@ def render(listing: dict[str, Any]) -> None:
                     queued_key = f"queued-{listing.get('id', '')}"
                     if st.session_state.get(queued_key):
                         st.info(
-                            "⏳ Queued — a Chrome window will open within ~5 min to fill this "
+                            "⏳ Queued — a Chrome window will open within a few minutes to fill this "
                             "application. Review it, then click Submit yourself. "
                             "(Keep your apply Chrome running.)"
                         )
@@ -265,7 +265,7 @@ def render(listing: dict[str, Any]) -> None:
                             )
                             st.session_state[queued_key] = True
                             st.toast(
-                                "Apply queued ✅ — a Chrome window will open within ~5 min to fill it.",
+                                "Apply queued ✅ — a Chrome window will open shortly to fill it.",
                                 icon="✅",
                             )
                             st.rerun()
