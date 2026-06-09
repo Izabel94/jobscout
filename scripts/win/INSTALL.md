@@ -8,7 +8,10 @@ A few one-time steps. It takes about 5 minutes. You only do this once.
 2. Right-click it and choose **Extract All**. A folder appears.
 3. Open that folder and double-click **install.bat**.
 4. A black window opens and runs for a few minutes. **Don't close it** - it's downloading everything it needs.
-5. When it says **"Install complete"**, send Izabel a text. She'll finish the last bit remotely.
+5. A **Chrome window opens to LinkedIn** - sign in with your own account, then leave that window open (you can minimize it). This is how Jobscout fills applications as you.
+6. Read the last line in the black window:
+   - **"Install complete! ... sign into LinkedIn"** → you're done after step 5.
+   - **"Please text Izabel"** → text her; she'll finish the last bit remotely.
 
 That's it. You don't need to type anything or change any files.
 

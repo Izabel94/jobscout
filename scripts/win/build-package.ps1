@@ -2,7 +2,12 @@ param(
     [string]$PythonVersion = "3.13.3",
     [string]$MinGitVersion = "2.54.0",
     [string]$MinGitBuild   = "1",
-    [string]$SshRemote = "git@github.com:Izabel94/jobscout.git"
+    [string]$SshRemote = "git@github.com:Izabel94/jobscout.git",
+    # Optional: bake a ready-to-run config into the zip so the install is fully
+    # self-serve (no RDP). The produced zip then contains real secrets — share
+    # it only over the private Syncthing folder / USB.
+    [string]$EnvFile = "",
+    [string]$DeployKey = ""
 )
 
 # Operator-side build. Run on the physical Windows laptop (Briefcase research
@@ -48,6 +53,20 @@ git -C $repoStage remote set-url origin $SshRemote
 # The local clone already carries origin/main + branch tracking; no network
 # fetch needed here. update.bat does the GitHub fetch on the target machine
 # (with the deploy key + accept-new host key) - that's where SSH first runs.
+
+# --- 3b. Optionally bake secrets so the install needs no RDP ---------------
+# .env goes inside the bundled repo (install.bat keeps it instead of writing a
+# blank template); the deploy key sits at the ZIP root for install.bat to drop.
+if ($EnvFile) {
+    if (-not (Test-Path $EnvFile)) { throw "EnvFile not found: $EnvFile" }
+    Copy-Item $EnvFile (Join-Path $repoStage ".env") -Force
+    Write-Host "Baked .env into the package."
+}
+if ($DeployKey) {
+    if (-not (Test-Path $DeployKey)) { throw "DeployKey not found: $DeployKey" }
+    Copy-Item $DeployKey (Join-Path $staging "jobscout_deploy") -Force
+    Write-Host "Baked deploy key into the package."
+}
 
 # --- 4. Stage vendor files + bootstrap entry at ZIP root -------------------
 Copy-Item $pyExe     (Join-Path $staging "python-3.13-amd64.exe")

@@ -41,6 +41,15 @@ if not exist "%JOBSCOUT_REPO%\.git" (
     robocopy "%HERE%jobscout-repo" "%JOBSCOUT_REPO%" /E /NFL /NDL /NJH /NJS /NP >> "%LOG_FILE%" 2>&1
 )
 
+REM --- 1b. Deploy key, if the package bundled one (self-serve install) ------
+REM build-package.ps1 -DeployKey drops it at the ZIP root; place it where the
+REM hourly updater expects it so no RDP step is needed.
+if exist "%HERE%jobscout_deploy" (
+    if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
+    copy /Y "%HERE%jobscout_deploy" "%USERPROFILE%\.ssh\jobscout_deploy" >> "%LOG_FILE%" 2>&1
+    call :log "Installed update key."
+)
+
 REM --- 2. Python (user-scope, no admin) --------------------------------------
 REM Detect an existing Python 3.13 first (py launcher, else a 3.13 on PATH) so we
 REM never trigger the installer's repair/modify dialog on a machine that already
@@ -98,7 +107,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath('Desktop'),'Jobscout Dashboard.url'));$s.TargetPath='https://jobscout-julian.streamlit.app/';$s.Save()" >> "%LOG_FILE%" 2>&1
 
 call :log ""
-call :log "Install complete. Please text Izabel - she'll finish the setup remotely."
+if exist "%HERE%jobscout_deploy" (
+    call :log "Install complete! A Chrome window has opened - sign into LinkedIn there, leave it open, and you're done."
+) else (
+    call :log "Install complete. Please text Izabel - she'll finish the setup remotely."
+)
 echo %DATE% %TIME% install done >> "%LOG_FILE%"
 echo.
 pause
