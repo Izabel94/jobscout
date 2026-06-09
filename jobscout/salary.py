@@ -29,12 +29,16 @@ _EXTRACT_SYSTEM = (
 )
 _EXTRACT_USER = (
     "Role: {title}\nCompany: {company}\nCity: {city}, Germany\n\n"
-    "From these kununu.com search snippets, estimate the typical annual GROSS "
-    "salary range in EUR. Prefer the named company; otherwise use similar roles. "
+    "From these kununu.com search snippets, give the typical annual GROSS salary "
+    "range in EUR for this role.\n"
     "Snippets:\n---\n{snippets}\n---\n\n"
     'Return strict JSON: {{"found": true|false, "min_eur": <number|null>, '
-    '"max_eur": <number|null>, "basis": "<short basis>"}}. '
-    "Set found=false if the snippets contain no usable salary figure."
+    '"max_eur": <number|null>, "basis": "<short basis>", "confidence": "high"|"low"}}.\n'
+    'Set confidence="high" ONLY when the snippets give a Kununu salary for THIS '
+    "company, at a matching seniority (a Senior role needs senior data). Use "
+    '"low" for any regional/role average, a different seniority, or an '
+    "extrapolation. Set found=false if there is no usable salary figure at all. "
+    "Respect seniority: never report a junior/mid range for a Senior title."
 )
 
 
@@ -53,18 +57,20 @@ def _to_eur(value: Any) -> Decimal | None:
     return out if out > 0 else None
 
 
-def coerce_estimate(data: dict[str, Any]) -> tuple[Decimal, Decimal, str] | None:
-    """Validate the extractor's JSON into (min, max, basis), or None."""
+def coerce_estimate(data: dict[str, Any]) -> tuple[Decimal, Decimal, str, str] | None:
+    """Validate the extractor's JSON into (min, max, basis, confidence), or None.
+    confidence is 'high' only when the model is confident; anything else -> 'low'."""
     if not data.get("found"):
         return None
     lo, hi = _to_eur(data.get("min_eur")), _to_eur(data.get("max_eur"))
     if lo is None or hi is None or lo > hi:
         return None
     basis = str(data.get("basis") or "Kununu estimate")[:200]
-    return lo, hi, basis
+    confidence = "high" if str(data.get("confidence", "")).lower() == "high" else "low"
+    return lo, hi, basis, confidence
 
 
-def _lookup(title: str, company: str) -> tuple[Decimal, Decimal, str] | None:
+def _lookup(title: str, company: str) -> tuple[Decimal, Decimal, str, str] | None:
     query = f"{title} {company} {_CITY} Gehalt Jahresgehalt"
     results = tavily_search(query, include_domains=["kununu.com"], max_results=5)
     if not results:
@@ -80,7 +86,7 @@ def _lookup(title: str, company: str) -> tuple[Decimal, Decimal, str] | None:
 
 def main() -> None:
     rows = list_pipeline_listings_legacy(_ACTIVE_STATUSES, limit=10_000)
-    cache: dict[tuple[str, str], tuple[Decimal, Decimal, str] | None] = {}
+    cache: dict[tuple[str, str], tuple[Decimal, Decimal, str, str] | None] = {}
     estimated = 0
     for row in rows:
         if row.get("rate_min") or row.get("rate_max") or row.get("salary_min"):
@@ -97,10 +103,13 @@ def main() -> None:
         result = cache[key]
         if result is None:
             continue
-        lo, hi, basis = result
-        set_listing_salary_estimate(row["id"], salary_min=float(lo), salary_max=float(hi), note=basis)
-        estimated += 1
-    log.info("salary: estimated %d listing(s) from %d lookup(s)", estimated, len(cache))
+        lo, hi, basis, confidence = result
+        set_listing_salary_estimate(
+            row["id"], salary_min=float(lo), salary_max=float(hi), note=basis, confidence=confidence
+        )
+        if confidence == "high":
+            estimated += 1
+    log.info("salary: %d high-confidence estimate(s) from %d lookup(s)", estimated, len(cache))
 
 
 if __name__ == "__main__":

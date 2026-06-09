@@ -43,14 +43,20 @@ def update_listing_status(
     _client().table("listings").update(patch).eq("id", listing_id).execute()
 
 
-def set_listing_salary_estimate(listing_id: str, *, salary_min: float, salary_max: float, note: str) -> None:
+def set_listing_salary_estimate(
+    listing_id: str, *, salary_min: float, salary_max: float, note: str, confidence: str = "low"
+) -> None:
     """Store a Kununu-derived salary estimate in the dedicated salary_* columns
-    (kept out of the scraper-owned rate_* fields so re-discovery can't wipe it)."""
+    (kept out of the scraper-owned rate_* fields so re-discovery can't wipe it).
+    salary_source is 'kununu' only for a high-confidence company/role match — the
+    UI shows a salary only for those; 'kununu_low_confidence' is stored (so it
+    isn't re-queried) but hidden."""
+    source = "kununu" if confidence == "high" else "kununu_low_confidence"
     _client().table("listings").update(
         {
             "salary_min": salary_min,
             "salary_max": salary_max,
-            "salary_source": "kununu_estimate",
+            "salary_source": source,
             "salary_note": note[:500],
         }
     ).eq("id", listing_id).execute()

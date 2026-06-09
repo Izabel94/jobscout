@@ -101,9 +101,12 @@ def salary_display(listing: dict[str, Any]) -> tuple[str, str] | None:
     lo, hi = _fmt_eur_k(listing.get("rate_min")), _fmt_eur_k(listing.get("rate_max"))
     if (lo or hi) and (listing.get("rate_unit") == "salary"):
         return (f"{lo or '?'}-{hi or '?'}/yr", "listed")
-    lo, hi = _fmt_eur_k(listing.get("salary_min")), _fmt_eur_k(listing.get("salary_max"))
-    if lo or hi:
-        return (f"≈ {lo or '?'}-{hi or '?'}/yr", "Kununu estimate")
+    # Only high-confidence (company/role-matched) Kununu figures are shown;
+    # regional extrapolations are stored as 'kununu_low_confidence' and hidden.
+    if listing.get("salary_source") == "kununu":
+        lo, hi = _fmt_eur_k(listing.get("salary_min")), _fmt_eur_k(listing.get("salary_max"))
+        if lo or hi:
+            return (f"≈ {lo or '?'}-{hi or '?'}/yr", "Kununu")
     return None
 
 
@@ -214,7 +217,7 @@ def render(listing: dict[str, Any]) -> None:
                 )
 
             salary_note = listing.get("salary_note")
-            if salary_note and listing.get("salary_source") == "kununu_estimate":
+            if salary_note and listing.get("salary_source") == "kununu":
                 st.caption(f"Salary basis: {salary_note}")
 
             desc = listing.get("description") or ""
