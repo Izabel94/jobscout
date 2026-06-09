@@ -37,7 +37,7 @@ def main() -> int:
         print(f"Place a sample CV PDF at {cv_pdf} before running.")
         return 2
 
-    external_ats.apply(
+    result = external_ats.apply(
         ats_url=DEMO_ATS_URL,
         proposal=PROPOSAL,
         cv_pdf_path=cv_pdf,
@@ -45,6 +45,7 @@ def main() -> int:
         listing_description="Diagnostic listing — do not apply for real.",
         adapted_cv_md="# Julian Engelke\n\nHamburg — smoke test\n",
     )
+    print(f"outcome={result.outcome.value}" + (f" reason={result.reason}" if result.reason else ""))
     return 0
 
 

@@ -15,9 +15,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import random
 import sys
+import time
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -34,6 +38,21 @@ class EasyApplyAfterClickError(RuntimeError):
     marks the apply_request failed, and flips listings.apply_method to easy_apply
     so the row surfaces under the manual section next time.
     """
+
+
+class ApplyOutcome(StrEnum):
+    """What the apply flow observed. The worker maps each to a DB transition;
+    only SUBMITTED records a submission."""
+
+    SUBMITTED = "submitted"
+    FILLED_NO_SUBMIT = "filled_no_submit"
+    NOT_FILLABLE = "not_fillable"
+
+
+@dataclass
+class ApplyResult:
+    outcome: ApplyOutcome
+    reason: str | None = None  # set for NOT_FILLABLE, e.g. "login_wall"
 
 
 _EASY_APPLY_HOST_FRAGMENT = "linkedin.com"
@@ -83,6 +102,52 @@ _APPLY_CTA_KEYWORDS = (
     "start application",
     "bewerbung",
 )
+
+
+# Capture-phase click listener that fires the moment the user clicks a
+# final-submit button — synchronously, before any navigation wipes the page.
+# add_init_script reinstalls it on every navigation and new tab, so multi-step
+# forms and post-submit redirects stay covered. The handler reports back to
+# Python via the __jsNotifySubmit binding so the signal survives the redirect.
+_SUBMIT_DETECTOR_JS = """
+(keywords) => {
+  if (window.__jsSubmitHooked) return;
+  window.__jsSubmitHooked = true;
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const el = t.closest('button, [role=button], input[type=submit], input[type=button], a');
+    if (!el) return;
+    const txt = (el.innerText || el.value || el.textContent || '').trim().toLowerCase();
+    if (keywords.some((k) => txt.includes(k)) && window.__jsNotifySubmit) {
+      window.__jsNotifySubmit(txt.slice(0, 120));
+    }
+  }, true);
+}
+"""
+
+
+def _install_submit_detector(context: BrowserContext, page: Page) -> dict[str, Any]:
+    """Watch for the user clicking a final-submit button. Returns a mutable
+    state dict whose `clicked` flag flips True when a submit click is seen."""
+    state: dict[str, Any] = {"clicked": False, "text": None}
+
+    def _on_submit(_source: dict[str, Any], text: str) -> None:
+        state["clicked"] = True
+        state["text"] = text
+
+    with contextlib.suppress(Exception):
+        context.expose_binding("__jsNotifySubmit", _on_submit)
+    keywords = list(_NEVER_CLICK_KEYWORDS)
+    # add_init_script (no args in the sync API) covers future navigations and
+    # new tabs; embed the keywords via JSON and self-invoke. evaluate once more
+    # for the page that's already loaded.
+    init_script = f"(() => {{ ({_SUBMIT_DETECTOR_JS})({json.dumps(keywords)}); }})()"
+    with contextlib.suppress(Exception):
+        context.add_init_script(init_script)
+    with contextlib.suppress(Exception):
+        page.evaluate(_SUBMIT_DETECTOR_JS, keywords)
+    return state
 
 
 def _think_pause(page: Page, seconds_range: tuple[float, float], label: str) -> None:
@@ -624,6 +689,35 @@ def _find_or_open_target_page(context: BrowserContext, ats_url: str) -> Page:
 # --- Public API --------------------------------------------------------------
 
 
+# How long to keep the filled tab open waiting for the user to click Submit.
+# Bounded so the worker exits cleanly (exit 0) rather than being killed by the
+# launchd wrapper's gtimeout backstop — a timeout there would read as a failure.
+_SUBMIT_WAIT_SECONDS = 600
+
+
+def _await_user_submit(
+    page: Page, submit_state: dict[str, Any], max_wait_seconds: float = _SUBMIT_WAIT_SECONDS
+) -> ApplyResult:
+    """Leave the filled tab open for the user to review and submit. Record a
+    submission ONLY when a final-submit click is observed; closing the tab — or
+    walking away — without that click is FILLED_NO_SUBMIT, never a phantom
+    submission."""
+    deadline = time.monotonic() + max_wait_seconds
+    while time.monotonic() < deadline:
+        if submit_state.get("clicked"):
+            print("  submit click detected — recording submission", flush=True)
+            return ApplyResult(ApplyOutcome.SUBMITTED)
+        try:
+            page.wait_for_event("close", timeout=1_000)
+        except PlaywrightTimeoutError:
+            continue
+        outcome = ApplyOutcome.SUBMITTED if submit_state.get("clicked") else ApplyOutcome.FILLED_NO_SUBMIT
+        print(f"  tab closed — outcome={outcome.value}", flush=True)
+        return ApplyResult(outcome)
+    print("  no submit within wait window — leaving tab open, marking attempted", flush=True)
+    return ApplyResult(ApplyOutcome.FILLED_NO_SUBMIT)
+
+
 def apply(
     *,
     ats_url: str,
@@ -632,7 +726,7 @@ def apply(
     listing_title: str,
     listing_description: str,
     adapted_cv_md: str,
-) -> None:
+) -> ApplyResult:
     cdp_url = os.environ.get("JOBSCOUT_CDP_URL")
     if not cdp_url:
         print(
@@ -643,7 +737,7 @@ def apply(
         )
         sys.exit(2)
     with sync_playwright() as p:
-        _run(p, cdp_url, ats_url, proposal, cv_pdf_path, listing_title, listing_description, adapted_cv_md)
+        return _run(p, cdp_url, ats_url, proposal, cv_pdf_path, listing_title, listing_description, adapted_cv_md)
 
 
 def _run(
@@ -655,7 +749,7 @@ def _run(
     listing_title: str,
     listing_description: str,
     adapted_cv_md: str,
-) -> None:
+) -> ApplyResult:
     print(f"Attaching to Chrome via {cdp_url}", flush=True)
     browser = p.chromium.connect_over_cdp(cdp_url)
     context = browser.contexts[0] if browser.contexts else browser.new_context()
@@ -672,6 +766,7 @@ def _run(
         print(f"Form page: {page.url}", flush=True)
 
         _assert_not_easy_apply(page)
+        submit_state = _install_submit_detector(context, page)
 
         if _dismiss_consent_banner(page):
             print("  dismissed consent banner", flush=True)
@@ -699,11 +794,10 @@ def _run(
                     print(
                         "No fillable form fields detected after walking apply CTAs. "
                         "The page may be a login wall, an account-creation step, "
-                        "or a non-standard widget. Inspect manually.",
+                        "or a non-standard widget. Flagging for manual apply.",
                         flush=True,
                     )
-                    page.wait_for_event("close", timeout=0)
-                    return
+                    return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
                 targets = fields
             else:
                 targets = _select_round_targets(fields, seen_field_ids)
@@ -757,7 +851,7 @@ def _run(
             "Review the form, fix anything the LLM skipped, then click Submit yourself.",
             flush=True,
         )
-        page.wait_for_event("close", timeout=0)
+        return _await_user_submit(page, submit_state)
     finally:
         browser.close()
 
