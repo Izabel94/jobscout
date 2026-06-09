@@ -83,6 +83,30 @@ def apply_method_badge_class(am: ApplyMethod | None) -> str:
     return "jobscout-badge jobscout-badge-easy"
 
 
+def _fmt_eur_k(value: Any) -> str:
+    """120000 -> '120k'; 67500 -> '67.5k'. Returns '' for missing/zero."""
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if n <= 0:
+        return ""
+    k = n / 1000
+    return f"€{k:.0f}k" if k == int(k) else f"€{k:.1f}k"
+
+
+def salary_display(listing: dict[str, Any]) -> tuple[str, str] | None:
+    """Return (range_label, provenance) for the card, or None when no salary
+    is known. A listing-stated rate wins over a Kununu estimate."""
+    lo, hi = _fmt_eur_k(listing.get("rate_min")), _fmt_eur_k(listing.get("rate_max"))
+    if (lo or hi) and (listing.get("rate_unit") == "salary"):
+        return (f"{lo or '?'}-{hi or '?'}/yr", "listed")
+    lo, hi = _fmt_eur_k(listing.get("salary_min")), _fmt_eur_k(listing.get("salary_max"))
+    if lo or hi:
+        return (f"≈ {lo or '?'}-{hi or '?'}/yr", "Kununu estimate")
+    return None
+
+
 def _escape(s: str | None) -> str:
     if not s:
         return ""
@@ -149,6 +173,15 @@ def render(listing: dict[str, Any]) -> None:
                 unsafe_allow_html=True,
             )
 
+        salary = salary_display(listing)
+        if salary:
+            range_label, provenance = salary
+            st.markdown(
+                f'<div class="jobscout-salary">💶 {_escape(range_label)} '
+                f'<span class="jobscout-salary-src">· {_escape(provenance)}</span></div>',
+                unsafe_allow_html=True,
+            )
+
         arr = _enum(Arrangement, listing.get("arrangement"))
         jt = _enum(JobType, listing.get("job_type_classified"))
         am = _enum(ApplyMethod, listing.get("apply_method"))
@@ -179,6 +212,10 @@ def render(listing: dict[str, Any]) -> None:
                     f'<div class="jobscout-rationale"><strong>Why this scored {score_str}</strong><br/>{_escape(rationale)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            salary_note = listing.get("salary_note")
+            if salary_note and listing.get("salary_source") == "kununu_estimate":
+                st.caption(f"Salary basis: {salary_note}")
 
             desc = listing.get("description") or ""
             if desc:
