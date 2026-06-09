@@ -43,6 +43,19 @@ def update_listing_status(
     _client().table("listings").update(patch).eq("id", listing_id).execute()
 
 
+def set_listing_salary_estimate(listing_id: str, *, salary_min: float, salary_max: float, note: str) -> None:
+    """Store a Kununu-derived salary estimate in the dedicated salary_* columns
+    (kept out of the scraper-owned rate_* fields so re-discovery can't wipe it)."""
+    _client().table("listings").update(
+        {
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "salary_source": "kununu_estimate",
+            "salary_note": note[:500],
+        }
+    ).eq("id", listing_id).execute()
+
+
 def mark_listing_viewed(listing_id: str) -> None:
     """Idempotent first-view marker. Only sets viewed_at if NULL."""
     _client().table("listings").update({"viewed_at": "now()"}).eq("id", listing_id).is_("viewed_at", "null").execute()

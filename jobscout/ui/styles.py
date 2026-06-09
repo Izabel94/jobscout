@@ -35,6 +35,9 @@ _CSS = """
   .jobscout-badge-dropped { background:#fee2e2; color:#991b1b; }
   .jobscout-badge-blocked { background:#fff7ed; color:#9a3412; border:1px solid #fdba74; }
 
+  .jobscout-salary { font-size:13px; color:#166534; font-weight:600; margin:2px 0; }
+  .jobscout-salary-src { color:#9ca3af; font-weight:400; font-size:11px; }
+
   /* Viewed-card left-border accent. The marker span is display:none itself;
      CSS :has() picks it up to style the enclosing card.
      data-test-scroll-behavior distinguishes the card-level stVerticalBlock

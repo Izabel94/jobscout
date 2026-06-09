@@ -128,6 +128,36 @@ def call_text(*, model: str, system: str, user: str, max_tokens: int = 2000) -> 
     raise LLMProviderError(f"LLM call failed after 3 attempts: {last_err}") from last_err
 
 
+def call_grounded(*, model: str, system: str, user: str, max_tokens: int = 1024) -> str:
+    """Single-shot Gemini call with Google Search grounding enabled — used for
+    web lookups (e.g. Kununu salary data). Gemini-only; grounding isn't wired
+    for other providers."""
+    if _provider_name() != "gemini":
+        raise LLMProviderError("call_grounded requires LLM_PROVIDER=gemini")
+    from google.genai import types
+
+    client = _gemini_client()
+    retryable = _retryable_excs()
+    last_err: BaseException | None = None
+    for attempt in range(3):
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=user,
+                config=types.GenerateContentConfig(
+                    system_instruction=system,
+                    max_output_tokens=max_tokens,
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                ),
+            )
+            return cast(str, getattr(resp, "text", "") or "")
+        except retryable as e:
+            last_err = e
+            wait = _rate_limit_wait_seconds(e) or float(2**attempt)
+            time.sleep(wait)
+    raise LLMProviderError(f"grounded LLM call failed after 3 attempts: {last_err}") from last_err
+
+
 def call_json(*, model: str, system: str, user: str, max_tokens: int = 2000) -> dict[str, Any]:
     raw = call_text(model=model, system=system, user=user, max_tokens=max_tokens)
     s = raw.strip()
