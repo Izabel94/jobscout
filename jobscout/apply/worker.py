@@ -22,10 +22,13 @@ from jobscout.db import (
     count_submissions_today_external,
     get_latest_draft_for_listing,
     get_listing_by_id,
+    mark_apply_request_attempted,
     mark_apply_request_done,
     mark_apply_request_failed,
+    mark_apply_request_manual_required,
     record_submission,
     recover_stale_apply_claims,
+    set_listing_apply_block_reason,
 )
 
 log = logging.getLogger("apply-worker")
@@ -131,6 +134,21 @@ def _record_submission_and_mark_done(request_id: str, listing_id: str, draft_id:
     mark_apply_request_done(request_id, executed_draft_id=draft_id, notes=None)
 
 
+def _handle_outcome(request_id: str, listing_id: str, draft_id: str, result: Any) -> None:
+    """Map an external_ats ApplyResult to a DB transition. Only a confirmed
+    submit click records a submission — the rest never do."""
+    from jobscout.apply.external_ats import ApplyOutcome
+
+    if result.outcome == ApplyOutcome.SUBMITTED:
+        _record_submission_and_mark_done(request_id, listing_id, draft_id)
+    elif result.outcome == ApplyOutcome.NOT_FILLABLE:
+        reason = result.reason or "not_fillable"
+        set_listing_apply_block_reason(listing_id, reason)
+        mark_apply_request_manual_required(request_id, reason=reason)
+    else:  # FILLED_NO_SUBMIT — filled but the user didn't submit (or not yet)
+        mark_apply_request_attempted(request_id, executed_draft_id=draft_id)
+
+
 def _flip_listing_to_easy_apply(listing_id: str) -> None:
     """Promote a misclassified EXTERNAL_APPLY listing to EASY_APPLY so the UI
     surfaces it under the manual section next time."""
@@ -158,7 +176,7 @@ def process_one(row: dict[str, Any]) -> None:
         from jobscout.apply import external_ats
 
         try:
-            external_ats.apply(
+            result = external_ats.apply(
                 ats_url=_ats_url_for(listing),
                 proposal=draft["body"],
                 cv_pdf_path=cv_pdf_path,
@@ -171,7 +189,7 @@ def process_one(row: dict[str, Any]) -> None:
             mark_apply_request_failed(request_id, error="easy_apply_detected_at_click", notes=None)
             return
 
-        _record_submission_and_mark_done(request_id, listing["id"], draft["id"])
+        _handle_outcome(request_id, listing["id"], draft["id"], result)
     except Exception as e:
         log.exception("apply request %s failed", request_id)
         mark_apply_request_failed(request_id, error=str(e), notes=None)

@@ -160,6 +160,9 @@ def render(listing: dict[str, Any]) -> None:
         if am is not None:
             label = "external apply" if am == ApplyMethod.EXTERNAL_APPLY else "easy apply (manual)"
             badges_html += f'<span class="{apply_method_badge_class(am)}">{label}</span>'
+        block_reason = listing.get("apply_block_reason")
+        if block_reason:
+            badges_html += '<span class="jobscout-badge jobscout-badge-blocked">⚠ login wall — apply manually</span>'
         if badges_html:
             st.markdown(badges_html, unsafe_allow_html=True)
 
@@ -204,7 +207,12 @@ def render(listing: dict[str, Any]) -> None:
                         update_listing_status(listing["id"], ListingStatus.REJECTED)
                         st.rerun()
             with col_right:
-                if am == ApplyMethod.EXTERNAL_APPLY:
+                if block_reason:
+                    raw = listing.get("raw") or {}
+                    apply_url = (raw.get("job_url_direct") if isinstance(raw, dict) else None) or listing.get("url", "#")
+                    st.link_button("Apply manually on site ↗", url=apply_url)
+                    st.caption("This site needs a login (e.g. Instaffo) — auto-fill isn't possible.")
+                elif am == ApplyMethod.EXTERNAL_APPLY:
                     if st.button("Apply", key=f"apply-{listing.get('id', '')}", type="primary"):
                         if listing.get("id"):
                             insert_apply_request(

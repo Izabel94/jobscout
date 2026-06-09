@@ -38,6 +38,21 @@ ts() { date '+%Y-%m-%dT%H:%M:%S%z'; }
 echo "" >> "$LOG_FILE"
 echo "==== $(ts) apply-worker starting ====" >> "$LOG_FILE"
 
+# Single-instance lock. A run now keeps the filled tab open for review (up to
+# ~10 min), so it can outlast the 5-min launchd tick — skip overlapping ticks
+# rather than attach a second worker to the same Chrome. mkdir is atomic and
+# portable (no flock on macOS). Reclaim a lock older than 30 min (prior run
+# killed, e.g. machine slept).
+LOCK_DIR="$LOG_DIR/apply-worker.lock"
+if [[ -d "$LOCK_DIR" && -n "$(find "$LOCK_DIR" -maxdepth 0 -mmin +30 2>/dev/null)" ]]; then
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+fi
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "$(ts) another worker holds the lock — skipping this tick" >> "$LOG_FILE"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
 # Cheap CDP probe — open a TCP connection to the debug port.
 # Skip silently if Chrome isn't up AND there are no pending rows. If
 # pending rows exist, surface a notification so the user knows.
@@ -68,10 +83,11 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 127
 fi
 
-# Cap at 240s so a hung CDP call can't lock out the next 5-min tick.
-# Exit 124 = timeout, falls through to the failure-notification branch.
+# Hard backstop only. The worker bounds its own review wait (~10 min) and
+# exits 0 normally; 900s sits above fill-time + that wait so a genuine hang
+# (exit 124) still surfaces as a failure, but normal review never trips it.
 JOBSCOUT_CDP_URL="http://localhost:$CDP_PORT" \
-  gtimeout 240 "$DOTENV" run -- "$PYTHON" -m jobscout.apply.worker >> "$LOG_FILE" 2>&1
+  gtimeout 900 "$DOTENV" run -- "$PYTHON" -m jobscout.apply.worker >> "$LOG_FILE" 2>&1
 status=$?
 
 if [[ $status -ne 0 ]]; then

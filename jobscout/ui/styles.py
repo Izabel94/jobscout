@@ -33,6 +33,7 @@ _CSS = """
   .jobscout-badge-external { background:#fef3c7; color:#854d0e; }
   .jobscout-badge-easy { background:#f3e8ff; color:#6b21a8; }
   .jobscout-badge-dropped { background:#fee2e2; color:#991b1b; }
+  .jobscout-badge-blocked { background:#fff7ed; color:#9a3412; border:1px solid #fdba74; }
 
   /* Viewed-card left-border accent. The marker span is display:none itself;
      CSS :has() picks it up to style the enclosing card.

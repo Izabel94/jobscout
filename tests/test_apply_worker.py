@@ -6,9 +6,16 @@ import pytest
 
 @pytest.fixture
 def fake_external_apply(monkeypatch):
-    """Replace external_ats.apply with a spy."""
+    """Replace external_ats.apply with a spy that reports a confirmed submit."""
+    from jobscout.apply.external_ats import ApplyOutcome, ApplyResult
+
     calls = []
-    fake = MagicMock(side_effect=lambda **kw: calls.append(kw))
+
+    def _fake(**kw):
+        calls.append(kw)
+        return ApplyResult(ApplyOutcome.SUBMITTED)
+
+    fake = MagicMock(side_effect=_fake)
     monkeypatch.setattr("jobscout.apply.external_ats.apply", fake)
     return calls, fake
 
@@ -169,6 +176,72 @@ def test_process_one_flips_apply_method_on_easy_apply_after_click(monkeypatch):
 
     assert flips == ["l1"]
     assert failed == [("r1", "easy_apply_detected_at_click")]
+
+
+def _listing(**over):
+    base = {
+        "id": "l1", "title": "T", "description": "D", "url": "https://x",
+        "raw": {"job_url_direct": "https://ats.example/job/1"},
+        "apply_method": "external_apply", "source": "linkedin",
+    }
+    base.update(over)
+    return base
+
+
+def _wire_outcome(monkeypatch, outcome_result):
+    """Drive process_one with a stubbed apply() returning outcome_result, and
+    spy on every terminal DB transition. Returns the spy dict."""
+    from jobscout.apply import worker
+
+    monkeypatch.setattr(worker, "_fetch_listing", lambda _: _listing())
+    monkeypatch.setattr(worker, "_fetch_latest_draft",
+                        lambda _: {"id": "draft-1", "body": "b", "adapted_cv": "c"})
+    monkeypatch.setattr(worker, "_render_cv_pdf", lambda *a, **kw: Path("/tmp/cv.pdf"))
+    monkeypatch.setattr("jobscout.apply.external_ats.apply", lambda **kw: outcome_result)
+
+    spy: dict[str, object] = {}
+    monkeypatch.setattr(worker, "_record_submission_and_mark_done",
+                        lambda rid, lid, did: spy.setdefault("submission", (rid, lid, did)))
+    monkeypatch.setattr(worker, "mark_apply_request_attempted",
+                        lambda rid, *, executed_draft_id, notes=None: spy.setdefault("attempted", (rid, executed_draft_id)))
+    monkeypatch.setattr(worker, "mark_apply_request_manual_required",
+                        lambda rid, *, reason, notes=None: spy.setdefault("manual_required", (rid, reason)))
+    monkeypatch.setattr(worker, "set_listing_apply_block_reason",
+                        lambda lid, reason: spy.setdefault("block_reason", (lid, reason)))
+    monkeypatch.setattr(worker, "mark_apply_request_failed",
+                        lambda rid, *, error, notes=None: spy.setdefault("failed", (rid, error)))
+
+    worker.process_one({"id": "req-1", "listing_id": "l1", "source": "linkedin"})
+    return spy
+
+
+def test_submitted_outcome_records_submission(monkeypatch):
+    from jobscout.apply.external_ats import ApplyOutcome, ApplyResult
+
+    spy = _wire_outcome(monkeypatch, ApplyResult(ApplyOutcome.SUBMITTED))
+    assert spy.get("submission") == ("req-1", "l1", "draft-1")
+    assert "attempted" not in spy and "manual_required" not in spy
+
+
+def test_filled_no_submit_does_not_record_submission(monkeypatch):
+    """The phantom-submission guard: a filled-but-not-submitted form must NOT
+    record a submission — it's marked 'attempted', nothing more."""
+    from jobscout.apply.external_ats import ApplyOutcome, ApplyResult
+
+    spy = _wire_outcome(monkeypatch, ApplyResult(ApplyOutcome.FILLED_NO_SUBMIT))
+    assert "submission" not in spy
+    assert spy.get("attempted") == ("req-1", "draft-1")
+
+
+def test_not_fillable_flags_listing_for_manual(monkeypatch):
+    """A login wall / 0-field page flags the listing (apply_block_reason) and
+    marks the request manual_required — never a submission, never a retry."""
+    from jobscout.apply.external_ats import ApplyOutcome, ApplyResult
+
+    spy = _wire_outcome(monkeypatch, ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall"))
+    assert "submission" not in spy
+    assert spy.get("block_reason") == ("l1", "login_wall")
+    assert spy.get("manual_required") == ("req-1", "login_wall")
 
 
 def test_main_loop_stops_at_daily_cap(monkeypatch):

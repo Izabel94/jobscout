@@ -322,6 +322,38 @@ def mark_apply_request_failed(request_id: str, *, error: str, notes: str | None 
     _client().table("apply_requests").update(payload).eq("id", request_id).execute()
 
 
+def mark_apply_request_attempted(request_id: str, *, executed_draft_id: str | None, notes: str | None = None) -> None:
+    """Form was filled but no submit click was observed. Terminal and
+    informational — NOT a submission. Shown as 'filled, not submitted'."""
+    payload: dict[str, Any] = {
+        "status": "attempted",
+        "completed_at": "now()",
+        "executed_draft_id": executed_draft_id,
+    }
+    if notes is not None:
+        payload["notes"] = notes[:2000]
+    _client().table("apply_requests").update(payload).eq("id", request_id).execute()
+
+
+def mark_apply_request_manual_required(request_id: str, *, reason: str, notes: str | None = None) -> None:
+    """The external page can't be auto-filled (login wall etc.). Terminal — no
+    retry, no submission. The listing carries the badge via apply_block_reason."""
+    payload: dict[str, Any] = {
+        "status": "manual_required",
+        "completed_at": "now()",
+        "error": reason[:2000],
+    }
+    if notes is not None:
+        payload["notes"] = notes[:2000]
+    _client().table("apply_requests").update(payload).eq("id", request_id).execute()
+
+
+def set_listing_apply_block_reason(listing_id: str, reason: str | None) -> None:
+    """Flag a listing whose external apply page needs manual handling (login
+    wall etc.); the dashboard badges it. Pass None to clear the flag."""
+    _client().table("listings").update({"apply_block_reason": reason}).eq("id", listing_id).execute()
+
+
 def recover_stale_apply_claims(*, stale_after_minutes: int = 30) -> int:
     """Reset rows stuck in 'processing' back to 'pending'. Covers worker crashes mid-apply."""
     cutoff = (datetime.now(tz=UTC) - timedelta(minutes=stale_after_minutes)).isoformat()
