@@ -33,7 +33,9 @@ for /f %%R in ('powershell -NoProfile -Command "(Test-NetConnection -ComputerNam
 if "%CDP_UP%"=="0" (
     REM Chrome is down. Check whether any apply_requests are pending.
     pushd "%JOBSCOUT_REPO%"
-    for /f %%P in ('"%DOTENV%" run -- "%PYTHON%" -c "from jobscout.db import list_apply_requests; print(sum(1 for r in list_apply_requests(limit=50) if r['status'] == 'pending'))" 2^>nul') do set PENDING=%%P
+    REM usebackq (backtick-delimited) so the single quotes in the Python (r['status'],
+    REM 'pending') aren't treated by cmd as the end of the for/f command.
+    for /f "usebackq" %%P in (`"%DOTENV%" run -- "%PYTHON%" -c "from jobscout.db import list_apply_requests; print(sum(1 for r in list_apply_requests(limit=50) if r['status'] == 'pending'))" 2^>nul`) do set PENDING=%%P
     popd
     if "!PENDING!"=="" set PENDING=0
     if !PENDING! GTR 0 (
