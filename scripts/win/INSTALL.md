@@ -1,29 +1,34 @@
-# Installing Jobscout
+# Jobscout — Setup on your Windows PC
 
-A few one-time steps. It takes about 5 minutes. You only do this once.
+Setup takes about **10 minutes** and you do it **once**. You won't type any
+commands or change any files.
+
+**Before you start:** have the file **`jobscout-windows.zip`** (in your
+Syncthing folder), and your **LinkedIn login** ready.
 
 ## Install
 
-1. Find the file `jobscout-windows.zip` in your Syncthing folder (or on the USB stick).
-2. Right-click it and choose **Extract All**. A folder appears.
-3. Open that folder and double-click **install.bat**.
-4. A black window opens and runs for a few minutes. **Don't close it** - it's downloading everything it needs.
-5. A **Chrome window opens to LinkedIn** - sign in with your own account, then leave that window open (you can minimize it). This is how Jobscout fills applications as you.
-6. Read the last line in the black window:
-   - **"Install complete! ... sign into LinkedIn"** → you're done after step 5.
-   - **"Please text Izabel"** → text her; she'll finish the last bit remotely.
+1. Find **`jobscout-windows.zip`**, right-click it → **Extract All**. A folder appears.
+2. Open that folder and double-click **`install.bat`**.
+3. Windows asks *"Allow this app to make changes?"* → click **Yes**.
+4. A black window runs for a few minutes (it's downloading what it needs). **Don't close it.**
+5. A **Chrome window opens to LinkedIn** → **sign in with your account**, then leave that window open (you can minimize it).
+6. When the black window says **"Install complete!"**, you're done.
 
-That's it. You don't need to type anything or change any files.
+If instead it says **"Please text Izabel"**, send her a text and she'll finish the last bit.
 
-## Using Jobscout every day
+## Using it day to day
 
-- Open **Jobscout Dashboard** from the shortcut on your desktop (it opens in your browser).
-- Look through the jobs. Click **Apply** on the ones you like.
-- Within a minute, a Chrome window opens and fills in the application for you.
-- Read it over, then click the **Submit** button on that page and close the window.
+1. Open **Jobscout Dashboard** from your desktop (it opens in your browser).
+2. Browse the jobs. Click **Apply** on the ones you like.
+3. Within a minute or two, a **Chrome window opens by itself and fills in the application**.
+4. **Read it over**, fix anything, then click the application's **Submit** button yourself and close the window.
 
-That's the whole routine.
+You always click Submit — nothing is sent without you. You don't need to keep
+any Chrome window open; it opens on its own when there's an application to fill.
 
-## If something looks wrong
+## Good to know
 
-Text Izabel. Please don't change or delete any files - she can fix everything remotely.
+- A job marked **"⚠ login wall — apply manually"** can't be auto-filled — click its **Apply manually on site** link and apply yourself.
+- Some applications run through another website's login. If one stops at a sign-in page, just apply there yourself.
+- **Don't move, rename, or delete any files.** If anything looks off, **text Izabel** — she can fix everything remotely.
