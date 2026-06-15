@@ -361,7 +361,9 @@ def _candidate_context(profile_row: dict[str, Any]) -> dict[str, str]:
         else "  (none configured)"
     )
     rate_eur = profile_row.get("target_rate_floor_eur")
+    salary_eur = profile_row.get("target_salary_eur")
     return {
+        "target_salary_eur": "" if salary_eur is None else str(int(salary_eur)),
         "candidate_name": str(profile_row.get("full_name", "")),
         "candidate_email": str(profile_row.get("email", "")),
         "candidate_phone": str(profile_row.get("phone", "")),
@@ -880,6 +882,8 @@ def _run(
         total_actions = 0
         advances = 0
         round_n = 0
+        cv_attached = False  # attach the CV once — some ATSes re-render the file
+        # input each round (new id), which would otherwise re-upload it.
 
         for round_n in range(1, _MAX_ROUNDS + 1):
             fields = _enumerate_fields(page)
@@ -936,12 +940,18 @@ def _run(
 
             print(f"Round {round_n}: LLM produced {len(actions)} action(s)", flush=True)
             for action in actions:
+                act = (action.get("action") or "").lower()
+                if act == "attach" and cv_attached:
+                    print(f"  [SKIP] {action.get('selector', '?')}  action=attach  CV already attached", flush=True)
+                    continue
                 _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
                 ok, note = _apply_action(page, action, cv_pdf_path, proposal)
                 label_hint = action.get("selector", "?")
                 print(f"  [{'OK' if ok else 'SKIP'}] {label_hint}  action={action.get('action')}  {note}", flush=True)
-                if ok and (action.get("action") or "").lower() != "skip":
+                if ok and act != "skip":
                     total_applied += 1
+                if ok and act == "attach":
+                    cv_attached = True
 
             # Wait for the page to render any conditional fields revealed by
             # the fills (or to surface re-renders that cleared a previous fill).
