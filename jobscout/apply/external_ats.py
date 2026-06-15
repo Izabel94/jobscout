@@ -908,6 +908,12 @@ def _run(
                         advances += 1
                         print(f"  advanced to next step (#{advances})", flush=True)
                         _assert_not_easy_apply(page)  # a step may route to Easy Apply
+                        # A login/register can appear mid-flow (e.g. join.com asks
+                        # for a password once the email is recognised). Don't stall
+                        # on it — flag for manual apply.
+                        if _has_password_field(page):
+                            print("  hit a login mid-flow (password field) — flagging for manual apply.", flush=True)
+                            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
                         continue
                     break
 
