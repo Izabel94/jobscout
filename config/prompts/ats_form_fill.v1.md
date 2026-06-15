@@ -15,6 +15,7 @@ in each field, or skip it if it's sensitive or doesn't apply.
 **Years of experience (overall):** {{years_experience}}
 **Available hours per week:** {{available_hours_per_week}}
 **Target hourly rate:** {{target_rate_eur_hr}} EUR / {{target_rate_usd_hr}} USD
+**Salary expectation (annual gross):** {{target_salary_eur}} EUR
 **Work authorization:** {{work_authorization}}
 
 ## Language proficiency (use these exactly for any language-level dropdown)
@@ -75,6 +76,12 @@ Rules for language proficiency fields:
 Rules for location fields:
 - The candidate's location is the value in "Location" above. Fill location fields (current location, residence, city, country) even when the job is remote — location asks where YOU are, not where the job is.
 - Required `Pflichtfeld` location fields must be filled, not skipped.
+- For a city/location autocomplete that filters as you type, use just the city name (e.g. "Hamburg"), not the full "City, Region, Country" string.
+
+Rules for salary / compensation fields:
+- Fill "Gehaltsvorstellung", "salary expectation", "desired salary", "Wunschgehalt" fields with the annual salary expectation above (digits only, e.g. "60000"), when it is set.
+- Use the hourly rate only for an explicitly hourly/Stundensatz field.
+- If no salary expectation is configured above, skip the field.
 
 Be conservative. It is much better to skip a field and let the user fill it than to type something wrong that gets submitted. But required fields ("Pflichtfeld", `aria-required="true"`) should be filled whenever you have data — only skip them if you genuinely don't know.
 
