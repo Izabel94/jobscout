@@ -54,8 +54,9 @@ fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
 # Cheap CDP probe — open a TCP connection to the debug port.
-# Skip silently if Chrome isn't up AND there are no pending rows. If
-# pending rows exist, surface a notification so the user knows.
+# If Chrome is down: when nothing is pending, exit silently; when something is
+# pending, launch the CDP Chrome on-demand and wait briefly for it to come up,
+# then fall through and process this run. No manual "open Chrome" step.
 if ! lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   pending=$(
     cd "$REPO_DIR" && \
@@ -66,14 +67,24 @@ print(n)
 " 2>/dev/null || echo 0
   )
   if [[ "${pending:-0}" -gt 0 ]]; then
-    notify "jobscout: $pending apply request(s) waiting" \
-      "Start Chrome with: bash scripts/chrome-cdp.sh"
+    notify "jobscout: opening apply browser" "Filling your $pending queued application(s)…"
+    echo "$(ts) CDP down with $pending pending — launching apply browser" >> "$LOG_FILE"
+    # Detached so Chrome outlives this worker run. chrome-cdp.sh exec's Chrome,
+    # so the backgrounded process IS Chrome.
+    nohup bash "$REPO_DIR/scripts/chrome-cdp.sh" >> "$LOG_FILE" 2>&1 &
+    disown 2>/dev/null || true
+    # Wait up to ~40s for the debug port (Chrome cold-start + profile load).
+    for _ in $(seq 1 20); do
+      sleep 2
+      lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1 && break
+    done
   fi
-  echo "$(ts) CDP Chrome down; pending=$pending — exiting" >> "$LOG_FILE"
-  # Intentional exit 0: don't pollute launchctl's last-exit-status with
-  # "Chrome not running" — that's a normal state for a 5-min poll.
-  # User already got a notification above if there were pending rows.
-  exit 0
+  if ! lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "$(ts) CDP Chrome not up (pending=${pending:-0}) — exiting; next tick will attach" >> "$LOG_FILE"
+    # Intentional exit 0: "Chrome not up yet" is a normal transient state.
+    exit 0
+  fi
+  echo "$(ts) apply browser is up — proceeding" >> "$LOG_FILE"
 fi
 
 cd "$REPO_DIR" || { notify "jobscout apply-worker" "cd $REPO_DIR failed"; exit 1; }
