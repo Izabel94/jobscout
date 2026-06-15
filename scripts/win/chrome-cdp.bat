@@ -14,6 +14,15 @@ REM Close the browser window when done.
 if "%PORT%"=="" set PORT=9223
 if "%PROFILE_DIR%"=="" set PROFILE_DIR=%LOCALAPPDATA%\jobscout\chrome-cdp
 
+REM If the debug port is already bound, Chrome is healthy — reuse it instead of
+REM launching a second window (apply-worker.bat call's this on-demand and would
+REM otherwise spawn a duplicate every tick).
+for /f %%R in ('powershell -NoProfile -Command "(Test-NetConnection -ComputerName localhost -Port %PORT% -InformationLevel Quiet -WarningAction SilentlyContinue) -as [int]"') do set PORT_UP=%%R
+if "%PORT_UP%"=="1" (
+    echo Apply browser already running on port %PORT% - reusing it.
+    exit /b 0
+)
+
 REM Honor the browser chosen at install time (install-chrome.ps1 writes "chrome"
 REM or "msedge" here when Chrome install fell back to Edge).
 set "BROWSER_FILE=%LOCALAPPDATA%\jobscout\browser.txt"
@@ -45,6 +54,16 @@ if "%JOBSCOUT_CHROME_BIN%"=="" (
 )
 
 if not exist "%PROFILE_DIR%" mkdir "%PROFILE_DIR%"
+
+REM Self-recover from a stale apply-Chrome. The port is down (checked above) yet
+REM a crashed/half-dead Chrome may still hold this profile, blocking the debug
+REM port from binding on the next launch. Kill ONLY browsers on the jobscout
+REM profile (matched by --user-data-dir on the command line) so the user's normal
+REM Chrome is never touched, then clear the leftover Singleton locks.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'chrome.exe' -or $_.Name -eq 'msedge.exe') -and $_.CommandLine -like '*jobscout\chrome-cdp*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" 2>nul
+del /q "%PROFILE_DIR%\SingletonLock" 2>nul
+del /q "%PROFILE_DIR%\SingletonCookie" 2>nul
+del /q "%PROFILE_DIR%\SingletonSocket" 2>nul
 
 echo Launching browser on port %PORT% with profile %PROFILE_DIR%
 echo After it opens: sign into LinkedIn once, then leave the window open.
