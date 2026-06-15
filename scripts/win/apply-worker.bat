@@ -31,12 +31,15 @@ REM Probe CDP via PowerShell Test-NetConnection (built-in, no install).
 for /f %%R in ('powershell -NoProfile -Command "(Test-NetConnection -ComputerName localhost -Port %CDP_PORT% -InformationLevel Quiet -WarningAction SilentlyContinue) -as [int]"') do set CDP_UP=%%R
 
 if "%CDP_UP%"=="0" (
-    REM Chrome is down. Check whether any apply_requests are pending.
+    REM Chrome is down. Count pending rows via a temp file — robust against
+    REM cmd's for/f quoting (the Python uses single quotes r['status']/'pending'
+    REM that for/f mangled, leaving PENDING empty -> 0).
     pushd "%JOBSCOUT_REPO%"
-    REM usebackq (backtick-delimited) so the single quotes in the Python (r['status'],
-    REM 'pending') aren't treated by cmd as the end of the for/f command.
-    for /f "usebackq" %%P in (`"%DOTENV%" run -- "%PYTHON%" -c "from jobscout.db import list_apply_requests; print(sum(1 for r in list_apply_requests(limit=50) if r['status'] == 'pending'))" 2^>nul`) do set PENDING=%%P
+    del "%LOG_DIR%\pending_count.txt" 2>nul
+    "%DOTENV%" run -- "%PYTHON%" -c "from jobscout.db import list_apply_requests; open(r'%LOG_DIR%\pending_count.txt','w').write(str(sum(1 for r in list_apply_requests(limit=50) if r['status']=='pending')))" 2>nul
     popd
+    set "PENDING="
+    if exist "%LOG_DIR%\pending_count.txt" set /p PENDING=<"%LOG_DIR%\pending_count.txt"
     if "!PENDING!"=="" set PENDING=0
     if !PENDING! GTR 0 (
         REM Open the apply browser on-demand instead of asking the user to. The
