@@ -601,6 +601,22 @@ def _looks_like_form(fields: list[dict[str, Any]]) -> bool:
     return len(fields) >= 3
 
 
+def _has_password_field(page: Page) -> bool:
+    """A visible password input means a login/register widget — never a real
+    job application form. Used to keep the walker from mistaking a sign-in box
+    for the application and to flag login walls as manual."""
+    try:
+        return bool(
+            page.evaluate(
+                "() => [...document.querySelectorAll('input[type=password]')]"
+                ".some(e => { const r = e.getBoundingClientRect();"
+                " return r.width > 0 && r.height > 0; })"
+            )
+        )
+    except Exception:
+        return False
+
+
 def _advance_to_next_step(page: Page) -> bool:
     """Click a strictly-allowlisted 'next page' button to reveal the next step
     of a multi-page form. NEVER clicks final-submit buttons — submitting is
@@ -649,7 +665,9 @@ def _walk_to_form(context: BrowserContext, page: Page) -> Page:
     for hop in range(_MAX_APPLY_HOPS):
         fields = _enumerate_fields(page)
         cta_href = _find_apply_cta(page)
-        if _looks_like_form(fields) or not cta_href:
+        # A login/register widget (password field) is not the application form —
+        # follow the apply CTA past it rather than stopping and filling it.
+        if (_looks_like_form(fields) and not _has_password_field(page)) or not cta_href:
             return page
         cta_href = _resolve_cta_href(cta_href)
         print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {cta_href[:90]}", flush=True)
@@ -766,6 +784,18 @@ def _run(
         print(f"Form page: {page.url}", flush=True)
 
         _assert_not_easy_apply(page)
+
+        # Still on a login/register page after walking the apply CTAs -> the
+        # application is behind a sign-in we can't pass. Don't fill the login
+        # form; flag it for manual apply.
+        if _has_password_field(page):
+            print(
+                "Apply is behind a login (password field present). Sign in on that "
+                "site once in this Chrome, or apply manually. Flagging for manual apply.",
+                flush=True,
+            )
+            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
+
         submit_state = _install_submit_detector(context, page)
 
         if _dismiss_consent_banner(page):
