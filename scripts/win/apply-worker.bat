@@ -37,7 +37,12 @@ if "%CDP_UP%"=="0" (
     popd
     if "!PENDING!"=="" set PENDING=0
     if !PENDING! GTR 0 (
-        powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\notify-toast.ps1" -Title "jobscout: !PENDING! apply request(s) waiting" -Body "Start Chrome via scripts\win\chrome-cdp.bat"
+        REM Open the apply browser on-demand instead of asking the user to. The
+        REM next tick (1 min) attaches once the debug port is up. chrome-cdp.bat
+        REM start's Chrome detached, so it outlives this run.
+        echo %DATE% %TIME% CDP down with !PENDING! pending - launching apply browser >> "%LOG_FILE%"
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%JOBSCOUT_REPO%\scripts\win\notify-toast.ps1" -Title "jobscout: opening apply browser" -Body "Filling your !PENDING! queued application(s)"
+        call "%JOBSCOUT_REPO%\scripts\win\chrome-cdp.bat" >> "%LOG_FILE%" 2>&1
     )
     echo %DATE% %TIME% CDP Chrome down; pending=!PENDING! - exiting >> "%LOG_FILE%"
     exit /b 0
