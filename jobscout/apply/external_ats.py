@@ -103,6 +103,14 @@ _APPLY_CTA_KEYWORDS = (
     "bewerbung",
 )
 
+# "Apply later" / save-for-later decoys — never the real apply CTA (join.com
+# shows a "Später bewerben" email-capture next to "Jetzt bewerben").
+_APPLY_LATER_KEYWORDS = ("später", "spater", "later", "merken", "save")
+
+# SSO / social-login buttons — never click these to advance (they open a
+# third-party auth popup). e.g. join.com's "Weiter mit Google".
+_SSO_KEYWORDS = ("google", "apple", "facebook", "linkedin", "microsoft", "sso", "single sign")
+
 
 # Capture-phase click listener that fires the moment the user clicks a
 # final-submit button — synchronously, before any navigation wipes the page.
@@ -625,10 +633,12 @@ def _advance_to_next_step(page: Page) -> bool:
         """(kw) => {
           const isNext = t => kw.next.some(n => t.includes(n));
           const isNever = t => kw.never.some(n => t.includes(n));
+          const isSso = t => kw.sso.some(n => t.includes(n));
           for (const el of document.querySelectorAll('button, [role="button"], a')) {
             const t = (el.textContent || '').trim().toLowerCase();
             if (!t || t.length > 25) continue;
             if (isNever(t)) continue;        // submit/apply/etc. take precedence
+            if (isSso(t)) continue;          // skip "Weiter mit Google" etc.
             if (!isNext(t)) continue;
             if (el.disabled) continue;
             const r = el.getBoundingClientRect();
@@ -639,7 +649,7 @@ def _advance_to_next_step(page: Page) -> bool:
           }
           return false;
         }""",
-        {"next": list(_NEXT_KEYWORDS), "never": list(_NEVER_CLICK_KEYWORDS)},
+        {"next": list(_NEXT_KEYWORDS), "never": list(_NEVER_CLICK_KEYWORDS), "sso": list(_SSO_KEYWORDS)},
     )
     if not marked:
         return False
@@ -658,34 +668,81 @@ def _advance_to_next_step(page: Page) -> bool:
             )
 
 
+def _click_apply_cta(page: Page) -> bool:
+    """Click a visible Apply/Bewerben CTA that has no link to follow (a button,
+    or an <a> with no usable href) — e.g. join.com's 'Jetzt bewerben' which
+    starts the apply flow via JS. Skips 'apply later' decoys and SSO buttons.
+    Direct-nav by href is preferred; this is the fallback. Returns True if it
+    clicked one (the flow usually navigates the same tab)."""
+    marked = page.evaluate(
+        """(kw) => {
+          const has = (t, list) => list.some(k => t.includes(k));
+          for (const el of document.querySelectorAll('a, button, [role="button"]')) {
+            const own = (el.textContent || '').trim();
+            if (!own || own.length > 60) continue;
+            const t = (own + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+            if (!has(t, kw.apply)) continue;
+            if (has(t, kw.later) || has(t, kw.sso)) continue;
+            if (el.tagName === 'A' && el.href && !el.href.endsWith('#')) continue;  // real link -> direct-nav handles it
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            if (r.width === 0 || r.height === 0 || cs.display === 'none' || cs.visibility === 'hidden') continue;
+            el.setAttribute('data-js-cta', '1');
+            return true;
+          }
+          return false;
+        }""",
+        {"apply": list(_APPLY_CTA_KEYWORDS), "later": list(_APPLY_LATER_KEYWORDS), "sso": list(_SSO_KEYWORDS)},
+    )
+    if not marked:
+        return False
+    try:
+        page.locator('[data-js-cta]').first.click(timeout=5_000)
+        page.wait_for_timeout(2_500)
+        return True
+    except (PlaywrightTimeoutError, Exception) as e:
+        print(f"  apply-button click failed: {e}", flush=True)
+        return False
+    finally:
+        with contextlib.suppress(Exception):
+            page.evaluate("() => document.querySelectorAll('[data-js-cta]').forEach(e => e.removeAttribute('data-js-cta'))")
+
+
 def _walk_to_form(context: BrowserContext, page: Page) -> Page:
     """Follow Apply CTAs until the page is an actual application form, up to
-    _MAX_APPLY_HOPS. A page with only stray fields (LinkedIn job-view) but a
-    visible Bewerben link is NOT the form — follow the link instead."""
+    _MAX_APPLY_HOPS. A page with only stray fields (a job-view, or an
+    'apply later' email box) but a visible apply CTA is NOT the form — follow
+    the link, or click the button when there's no link."""
     for hop in range(_MAX_APPLY_HOPS):
         fields = _enumerate_fields(page)
+        # A login/register widget (password field) is not the application form.
+        if _looks_like_form(fields) and not _has_password_field(page):
+            return page
         cta_href = _find_apply_cta(page)
-        # A login/register widget (password field) is not the application form —
-        # follow the apply CTA past it rather than stopping and filling it.
-        if (_looks_like_form(fields) and not _has_password_field(page)) or not cta_href:
-            return page
-        cta_href = _resolve_cta_href(cta_href)
-        print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {cta_href[:90]}", flush=True)
-        # Direct nav beats clicking — JS handlers often call window.open which
-        # is blocked for non-trusted events.
-        try:
-            new_page = context.new_page()
-            new_page.goto(cta_href, wait_until="domcontentloaded", timeout=30_000)
-            new_page.wait_for_timeout(2_000)
-            if hop > 0:
+        if cta_href:
+            cta_href = _resolve_cta_href(cta_href)
+            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {cta_href[:90]}", flush=True)
+            # Direct nav beats clicking — JS handlers often call window.open which
+            # is blocked for non-trusted events.
+            try:
+                new_page = context.new_page()
+                new_page.goto(cta_href, wait_until="domcontentloaded", timeout=30_000)
+                new_page.wait_for_timeout(2_000)
+                if hop > 0:
+                    with contextlib.suppress(Exception):
+                        page.close()
+                page = new_page
                 with contextlib.suppress(Exception):
-                    page.close()
-            page = new_page
-            with contextlib.suppress(Exception):
-                page.bring_to_front()
-        except Exception as e:
-            print(f"  hop failed: {e}", flush=True)
-            return page
+                    page.bring_to_front()
+            except Exception as e:
+                print(f"  hop failed: {e}", flush=True)
+                return page
+            continue
+        # No link to follow — try clicking a button CTA (JS-driven apply flow).
+        if _click_apply_cta(page):
+            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: clicked apply button -> {page.url[:90]}", flush=True)
+            continue
+        return page
     return page
 
 
