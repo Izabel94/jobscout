@@ -690,14 +690,22 @@ def _walk_to_form(context: BrowserContext, page: Page) -> Page:
 
 
 def _find_or_open_target_page(context: BrowserContext, ats_url: str) -> Page:
-    """Reuse an existing tab on the same host (LinkedIn flow lands here pre-opened) or open new."""
+    """Reuse a tab on the same host, but always navigate it to the target URL —
+    otherwise a stray same-host tab (e.g. the linkedin.com/feed page the apply
+    Chrome opens on) gets mistaken for the job and 'filled'. Opens a new tab if
+    no same-host one exists."""
     target_host = (urlparse(ats_url).hostname or "").lower()
+    want = (ats_url or "").rstrip("/")
     for pg in context.pages:
         try:
             host = (urlparse(pg.url).hostname or "").lower()
         except Exception:
             continue
         if host and host == target_host:
+            if (pg.url or "").rstrip("/") != want:
+                with contextlib.suppress(Exception):
+                    pg.goto(ats_url, wait_until="domcontentloaded", timeout=30_000)
+                    pg.wait_for_timeout(1_500)
             return pg
     page = context.new_page()
     page.goto(ats_url, wait_until="domcontentloaded", timeout=30_000)
