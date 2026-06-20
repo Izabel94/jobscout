@@ -18,6 +18,11 @@ pyyaml>=6.0,<7.0
 jinja2>=3.1,<4.0
 markdown>=3.7,<4.0
 streamlit>=1.40,<2.0
+# Pin numpy/pandas to versions that ship prebuilt cp313 Windows wheels. Left
+# unpinned, the resolver picks pandas 3.x, which drags numpy down to a sdist-only
+# release and forces a from-source build (no MSVC on the target machine).
+numpy>=2.1,<3.0
+pandas>=2.2,<3.0
 python-jobspy>=1.1,<2.0
 lingua-language-detector>=2.0,<3.0
 sentence-transformers>=3.3,<4.0

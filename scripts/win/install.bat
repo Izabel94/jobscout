@@ -58,7 +58,7 @@ REM progress) instead of /quiet, which can hang silently behind a dialog.
 set "PYLAUNCH="
 py -3.13 --version >nul 2>&1 && set "PYLAUNCH=py -3.13"
 if not defined PYLAUNCH (
-    python --version 2>&1 | findstr /b "Python 3.13" >nul && set "PYLAUNCH=python"
+    python --version 2>&1 | findstr /b /c:"Python 3.13" >nul && set "PYLAUNCH=python"
 )
 if not defined PYLAUNCH (
     call :log "Installing Python 3.13..."
