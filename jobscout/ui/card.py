@@ -273,7 +273,6 @@ def render(listing: dict[str, Any]) -> None:
                             )
                             st.rerun()
                 else:
-                    st.link_button(
-                        "Open in LinkedIn ↗",
-                        url=listing.get("url", "#"),
-                    )
+                    src = (listing.get("source") or "").lower()
+                    label = "Open in LinkedIn ↗" if src == "linkedin" else "Open original posting ↗"
+                    st.link_button(label, url=listing.get("url", "#"))
