@@ -30,3 +30,18 @@ def test_assert_not_easy_apply_raises_for_case_and_query_variants():
         _assert_not_easy_apply(
             _fake_page("https://www.LINKEDIN.com/jobs/easyApply/4123456789/?refId=abc")
         )
+
+
+def test_assert_not_easy_apply_raises_for_sdui_apply_overlay():
+    # The newer SDUI apply flow keeps the /jobs/view/<id>/ URL — caught by host.
+    with pytest.raises(EasyApplyAfterClickError):
+        _assert_not_easy_apply(
+            _fake_page("https://www.linkedin.com/jobs/view/4427370199/?trackingId=EX8")
+        )
+
+
+def test_assert_not_easy_apply_raises_for_any_linkedin_form_page():
+    with pytest.raises(EasyApplyAfterClickError):
+        _assert_not_easy_apply(
+            _fake_page("https://www.linkedin.com/jobs/view/4427370199/apply/?openSDUIApplyFlow=true")
+        )

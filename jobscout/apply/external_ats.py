@@ -33,10 +33,12 @@ from jobscout.llm import LLMJSONError, call_json
 
 
 class EasyApplyAfterClickError(RuntimeError):
-    """Raised when the apply flow lands on linkedin.com/jobs/easyApply/* despite
-    the listing being classified as EXTERNAL_APPLY. The worker catches this,
-    marks the apply_request failed, and flips listings.apply_method to easy_apply
-    so the row surfaces under the manual section next time.
+    """Raised when the apply flow reaches the form still on linkedin.com despite
+    the listing being classified as EXTERNAL_APPLY — i.e. LinkedIn's in-app apply
+    (classic /jobs/easyApply/ or the newer SDUI /jobs/view/<id>/apply overlay),
+    which we can't fill. The worker catches this, marks the apply_request failed,
+    and flips listings.apply_method to easy_apply so the row surfaces under the
+    manual section next time.
     """
 
 
@@ -56,13 +58,16 @@ class ApplyResult:
 
 
 _EASY_APPLY_HOST_FRAGMENT = "linkedin.com"
-_EASY_APPLY_PATH_FRAGMENT = "/jobs/easyApply/"
 
 
 def _assert_not_easy_apply(page: Page) -> None:
+    # A genuine external apply redirects off LinkedIn to the employer's ATS.
+    # If we've reached the form and are still on linkedin.com, it's the in-app
+    # apply (classic /jobs/easyApply/ or the SDUI /apply overlay, which keeps the
+    # /jobs/view/<id>/ URL) — not fillable, so surface it for manual apply.
     url = (page.url or "").lower()
-    if _EASY_APPLY_HOST_FRAGMENT in url and _EASY_APPLY_PATH_FRAGMENT.lower() in url:
-        raise EasyApplyAfterClickError(f"landed on Easy Apply URL: {page.url}")
+    if _EASY_APPLY_HOST_FRAGMENT in url:
+        raise EasyApplyAfterClickError(f"still on LinkedIn at form step (Easy Apply): {page.url}")
 
 
 _PAGE_THINK_SECONDS = (10.0, 18.0)
