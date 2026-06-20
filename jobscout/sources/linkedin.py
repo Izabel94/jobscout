@@ -115,7 +115,7 @@ class LinkedInSource(SourceAdapter):
                         description=description,
                         location=str(d.get("location") or ""),
                         remote=bool(d.get("is_remote")),
-                        language="en",
+                        language=None,
                         rate_min=rate_min,
                         rate_max=rate_max,
                         rate_unit=rate_unit,

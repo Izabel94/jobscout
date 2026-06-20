@@ -70,7 +70,7 @@ def _build_proposal_prompt(profile: dict, listing: Listing, language: str, conta
 
 def draft_one(listing: Listing) -> Draft:
     profile = load_profile()
-    cv_language = listing.language or "en"
+    cv_language = listing.language or "de"
     cv_base_md = load_cv_markdown(cv_language)
 
     contact_name = _extract_contact_name(listing.description or "")
