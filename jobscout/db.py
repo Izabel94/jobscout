@@ -62,6 +62,14 @@ def set_listing_salary_estimate(
     ).eq("id", listing_id).execute()
 
 
+def mark_listing_salary_unavailable(listing_id: str) -> None:
+    """Record that Kununu had no usable salary for this listing so the salary
+    stage skips it on later runs instead of burning a Tavily search every time."""
+    _client().table("listings").update(
+        {"salary_source": "kununu_none", "salary_note": "no kununu salary data"}
+    ).eq("id", listing_id).execute()
+
+
 def mark_listing_viewed(listing_id: str) -> None:
     """Idempotent first-view marker. Only sets viewed_at if NULL."""
     _client().table("listings").update({"viewed_at": "now()"}).eq("id", listing_id).is_("viewed_at", "null").execute()
