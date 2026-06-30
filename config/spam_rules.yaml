@@ -55,10 +55,19 @@ media_agencies:
   - Remazing
   - Front Row
 
-# Generic agency tells in a company NAME catch agencies not yet listed above.
+# Generic agency tells in a company NAME catch agencies not yet listed above —
+# media/marketing plus staffing/recruiting firms (Julian wants in-house roles).
 media_agency_company_keywords:
   - agentur
   - agency
+  - personalvermittlung
+  - personaldienstleist
+  - personalberatung
+  - zeitarbeit
+  - arbeitnehmerüberlassung
+  - recruiting
+  - staffing
+  - headhunt
 
 werkstudent_overload_threshold_hours: 20
 
