@@ -32,16 +32,6 @@ class _ProviderFn(Protocol):
     def __call__(self, *, model: str, system: str, user: str, max_tokens: int) -> str: ...
 
 
-def _call_anthropic(*, model: str, system: str, user: str, max_tokens: int) -> str:
-    msg = _anthropic_client().messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return cast(str, getattr(msg.content[0], "text", ""))
-
-
 def _call_gemini(*, model: str, system: str, user: str, max_tokens: int) -> str:
     client = _gemini_client()
     resp = client.models.generate_content(
@@ -56,16 +46,8 @@ def _call_gemini(*, model: str, system: str, user: str, max_tokens: int) -> str:
 
 
 _PROVIDERS: dict[str, _ProviderFn] = {
-    "anthropic": _call_anthropic,
     "gemini": _call_gemini,
 }
-
-
-@lru_cache(maxsize=1)
-def _anthropic_client() -> Any:
-    from anthropic import Anthropic
-
-    return Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
 @lru_cache(maxsize=1)
@@ -76,21 +58,14 @@ def _gemini_client() -> Any:
 
 
 def _provider() -> _ProviderFn:
-    name = _provider_name()
-    try:
-        return _PROVIDERS[name]
-    except KeyError as e:
-        raise LLMProviderError(f"Unknown LLM_PROVIDER {name!r}; expected one of {sorted(_PROVIDERS)}") from e
+    # jobscout is gemini-only; any other LLM_PROVIDER value (including a stale
+    # 'anthropic' inherited from sidegig config) resolves to gemini rather than
+    # crashing on a missing SDK.
+    return _PROVIDERS.get(_provider_name(), _call_gemini)
 
 
 def _retryable_excs() -> tuple[type[BaseException], ...]:
-    """Provider-specific exception classes to retry on. `_provider()` runs first,
-    so by the time we get here the provider name is known to be valid."""
-    name = _provider_name()
-    if name == "anthropic":
-        from anthropic import APIError
-
-        return (APIError,)
+    """Gemini exception classes to retry on (429 / RESOURCE_EXHAUSTED etc.)."""
     from google.genai import errors as genai_errors
 
     return (genai_errors.APIError,)
