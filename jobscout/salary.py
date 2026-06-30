@@ -11,7 +11,11 @@ import logging
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from jobscout.db import list_pipeline_listings_legacy, set_listing_salary_estimate
+from jobscout.db import (
+    list_pipeline_listings_legacy,
+    mark_listing_salary_unavailable,
+    set_listing_salary_estimate,
+)
 from jobscout.llm import LLMJSONError, call_json
 from jobscout.models import ListingStatus
 from jobscout.search import SearchError, tavily_search
@@ -89,8 +93,8 @@ def main() -> None:
     cache: dict[tuple[str, str], tuple[Decimal, Decimal, str, str] | None] = {}
     estimated = 0
     for row in rows:
-        if row.get("rate_min") or row.get("rate_max") or row.get("salary_min"):
-            continue  # already has a listed rate or a prior estimate
+        if row.get("rate_min") or row.get("rate_max") or row.get("salary_min") or row.get("salary_source"):
+            continue  # already has a listed rate, a prior estimate, or a prior Kununu attempt
         company = str((row.get("raw") or {}).get("company") or "")
         title = row.get("title") or ""
         key = (company.lower().strip(), " ".join(title.lower().split()))
@@ -102,6 +106,7 @@ def main() -> None:
                 break
         result = cache[key]
         if result is None:
+            mark_listing_salary_unavailable(row["id"])
             continue
         lo, hi, basis, confidence = result
         set_listing_salary_estimate(

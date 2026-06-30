@@ -81,6 +81,39 @@ def test_salary_main_estimates_skips_and_caches(monkeypatch):
     assert saved[0][1:] == (55000.0, 70000.0, "high")
 
 
+def test_salary_main_marks_unavailable_when_no_kununu_data(monkeypatch):
+    rows = [{"id": "a", "title": "Role", "raw": {"company": "Acme"}}]
+    monkeypatch.setattr(salary_mod, "list_pipeline_listings_legacy", lambda *a, **k: rows)
+    monkeypatch.setattr(salary_mod, "tavily_search", lambda *a, **k: [])  # no results -> _lookup returns None
+    saved: list = []
+    monkeypatch.setattr(salary_mod, "set_listing_salary_estimate", lambda *a, **k: saved.append(a))
+    marked: list[str] = []
+    monkeypatch.setattr(salary_mod, "mark_listing_salary_unavailable", lambda lid: marked.append(lid))
+
+    salary_mod.main()
+
+    assert marked == ["a"]  # persisted so the next run skips it
+    assert saved == []
+
+
+def test_salary_main_skips_prior_kununu_attempt(monkeypatch):
+    rows = [{"id": "a", "title": "Role", "raw": {"company": "Acme"}, "salary_source": "kununu_none"}]
+    monkeypatch.setattr(salary_mod, "list_pipeline_listings_legacy", lambda *a, **k: rows)
+    searches = {"n": 0}
+
+    def _search(*a, **k):
+        searches["n"] += 1
+        return []
+
+    monkeypatch.setattr(salary_mod, "tavily_search", _search)
+    monkeypatch.setattr(salary_mod, "mark_listing_salary_unavailable", lambda lid: None)
+    monkeypatch.setattr(salary_mod, "set_listing_salary_estimate", lambda *a, **k: None)
+
+    salary_mod.main()
+
+    assert searches["n"] == 0  # a prior Kununu attempt is never re-searched
+
+
 def test_salary_main_aborts_when_search_unavailable(monkeypatch):
     from jobscout.search import SearchError
 
