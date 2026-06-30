@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jobscout.llm import LLMJSONError, LLMProviderError, call_json, call_text
+from jobscout.llm import LLMJSONError, call_json
 
 
 @patch("jobscout.llm._provider")
@@ -24,7 +24,11 @@ def test_call_json_strips_markdown_fence(mock_provider):
     assert call_json(model="m", system="s", user="u") == {"a": 1}
 
 
-def test_unknown_provider_raises(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "bogus")
-    with pytest.raises(LLMProviderError):
-        call_text(model="m", system="s", user="u")
+def test_any_provider_resolves_to_gemini(monkeypatch):
+    # jobscout is gemini-only: a stale 'anthropic' or any unknown value must
+    # resolve to the gemini provider, never import a missing SDK.
+    from jobscout.llm import _call_gemini, _provider
+
+    for value in ("anthropic", "bogus", "GEMINI"):
+        monkeypatch.setenv("LLM_PROVIDER", value)
+        assert _provider() is _call_gemini
