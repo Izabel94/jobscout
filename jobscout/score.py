@@ -58,11 +58,17 @@ def main() -> None:
                 user=_build_score_prompt(profile, listing.model_dump(mode="json")),
                 max_tokens=2000,
             )
+            score = int(out["score"])
+            rationale = str(out.get("rationale", ""))
+            red_flags = out.get("red_flags") or []
+            if any("agency" in str(flag).lower() for flag in red_flags):
+                update_listing_status(
+                    listing_id, ListingStatus.REJECTED, score=score, score_rationale=rationale
+                )
+                log.info("rejected agency listing %s (LLM-judged)", listing_id)
+                continue
             update_listing_status(
-                listing_id,
-                ListingStatus.SCORED,
-                score=int(out["score"]),
-                score_rationale=str(out.get("rationale", "")),
+                listing_id, ListingStatus.SCORED, score=score, score_rationale=rationale
             )
         except (LLMJSONError, KeyError, ValueError) as e:
             log.error("score failed for %s: %s", listing_id, e)
