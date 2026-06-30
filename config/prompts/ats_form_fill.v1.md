@@ -44,7 +44,7 @@ Return ONLY a JSON object with this exact shape — no preamble, no markdown fen
 ```
 {
   "actions": [
-    {"selector": "<the exact selector from the field list>", "action": "type|paste|select|check|uncheck|attach|skip", "value": "<value or option label or 'cover_letter' or 'cv_pdf'>"}
+    {"selector": "<the exact selector from the field list>", "action": "type|paste|select|check|uncheck|attach|skip", "value": "<value or option label or 'cover_letter' or 'cv_pdf' or 'cover_letter_pdf'>"}
   ]
 }
 ```
@@ -57,7 +57,7 @@ Rules for choosing an action:
 - `select` — dropdowns / select elements. `value` must be one of the option labels listed for that field. Match the candidate's profile to the closest available option.
 - `check` — checkboxes / radios that should be ticked. For "I accept the terms" / "I am authorized to work" / required acknowledgements: check them.
 - `uncheck` — for opt-in marketing checkboxes: leave unchecked.
-- `attach` — file inputs. `value` must be `"cv_pdf"` (the CV PDF path will be resolved by the script).
+- `attach` — file inputs. For a CV / résumé / "Lebenslauf" upload, `value` must be `"cv_pdf"`. For a cover-letter / "Anschreiben" / "Motivationsschreiben" file upload (a file input, NOT a textarea), `value` must be `"cover_letter_pdf"`. Both paths are resolved by the script. Use `cover_letter_pdf` only for an actual file-upload field; for a text box use `paste` with `"@cover_letter"`.
 - `skip` — when you're not sure, OR when the field is EEOC/voluntary self-identification (gender, race, disability, veteran status). The user will fill these manually.
 
 Rules for sensitive fields:

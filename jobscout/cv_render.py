@@ -9,6 +9,7 @@ the PDF directly via `page.pdf(...)` — no native deps required.
 from __future__ import annotations
 
 import base64
+import html as html_lib
 import mimetypes
 import re
 from pathlib import Path
@@ -65,6 +66,22 @@ def cv_markdown_to_pdf(cv_md: str, out_path: Path, *, page: Page) -> Path:
         body_html=body_html,
         photo_data_uri=_photo_data_uri(),
     )
+    page.set_content(html, wait_until="networkidle")
+    page.pdf(path=str(out_path), format="A4", print_background=True)
+    return out_path
+
+
+_COVER_LETTER_HTML = (
+    "<html><head><meta charset='utf-8'><style>"
+    "body{font-family:Helvetica,Arial,sans-serif;font-size:11pt;line-height:1.5;"
+    "margin:2.5cm;white-space:pre-wrap;}</style></head><body>__BODY__</body></html>"
+)
+
+
+def cover_letter_to_pdf(cover_letter: str, out_path: Path, *, page: Page) -> Path:
+    """Render the plain-text cover letter to an A4 PDF, for forms that want the
+    cover letter as a file upload rather than a textarea."""
+    html = _COVER_LETTER_HTML.replace("__BODY__", html_lib.escape(cover_letter or ""))
     page.set_content(html, wait_until="networkidle")
     page.pdf(path=str(out_path), format="A4", print_background=True)
     return out_path

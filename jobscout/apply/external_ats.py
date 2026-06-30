@@ -427,7 +427,11 @@ def _ask_llm_for_actions(
 
 
 def _apply_action(
-    page: Page, action: dict[str, Any], cv_pdf_path: Path | None, cover_letter: str
+    page: Page,
+    action: dict[str, Any],
+    cv_pdf_path: Path | None,
+    cover_letter: str,
+    cover_letter_pdf_path: Path | None = None,
 ) -> tuple[bool, str]:
     """Returns (applied, note). `@cover_letter` and `cv_pdf` are LLM-friendly sentinels resolved here."""
     selector = action.get("selector") or ""
@@ -487,6 +491,11 @@ def _apply_action(
             return True, "unchecked"
 
         if kind == "attach":
+            if value == "cover_letter_pdf":
+                if cover_letter_pdf_path is None or not cover_letter_pdf_path.exists():
+                    return False, f"attach skipped (cover_letter_pdf missing: {cover_letter_pdf_path})"
+                loc.set_input_files(str(cover_letter_pdf_path))
+                return True, f"attached {cover_letter_pdf_path.name}"
             if value != "cv_pdf" or cv_pdf_path is None or not cv_pdf_path.exists():
                 return False, f"attach skipped (value={value!r}, cv_pdf={cv_pdf_path})"
             loc.set_input_files(str(cv_pdf_path))
@@ -816,6 +825,7 @@ def apply(
     listing_title: str,
     listing_description: str,
     adapted_cv_md: str,
+    cover_letter_pdf_path: Path | None = None,
 ) -> ApplyResult:
     cdp_url = os.environ.get("JOBSCOUT_CDP_URL")
     if not cdp_url:
@@ -827,7 +837,10 @@ def apply(
         )
         sys.exit(2)
     with sync_playwright() as p:
-        return _run(p, cdp_url, ats_url, proposal, cv_pdf_path, listing_title, listing_description, adapted_cv_md)
+        return _run(
+            p, cdp_url, ats_url, proposal, cv_pdf_path,
+            listing_title, listing_description, adapted_cv_md, cover_letter_pdf_path,
+        )
 
 
 def _run(
@@ -839,6 +852,7 @@ def _run(
     listing_title: str,
     listing_description: str,
     adapted_cv_md: str,
+    cover_letter_pdf_path: Path | None = None,
 ) -> ApplyResult:
     print(f"Attaching to Chrome via {cdp_url}", flush=True)
     browser = p.chromium.connect_over_cdp(cdp_url)
@@ -950,7 +964,7 @@ def _run(
                     print(f"  [SKIP] {action.get('selector', '?')}  action=attach  CV already attached", flush=True)
                     continue
                 _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
-                ok, note = _apply_action(page, action, cv_pdf_path, proposal)
+                ok, note = _apply_action(page, action, cv_pdf_path, proposal, cover_letter_pdf_path)
                 label_hint = action.get("selector", "?")
                 print(f"  [{'OK' if ok else 'SKIP'}] {label_hint}  action={action.get('action')}  {note}", flush=True)
                 if ok and act != "skip":
