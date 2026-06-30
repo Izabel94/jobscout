@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from jobscout.apply.external_ats import (
+    _EASY_APPLY_SUBMIT_RE,
     EasyApplyAfterClickError,
     _assert_not_easy_apply,
 )
@@ -45,3 +46,11 @@ def test_assert_not_easy_apply_raises_for_any_linkedin_form_page():
         _assert_not_easy_apply(
             _fake_page("https://www.linkedin.com/jobs/view/4427370199/apply/?openSDUIApplyFlow=true")
         )
+
+
+def test_easy_apply_submit_label_detection():
+    # The driver must stop (never click) on these; advance on the rest.
+    for label in ("submit application", "Bewerbung absenden", "absenden"):
+        assert _EASY_APPLY_SUBMIT_RE.search(label)
+    for label in ("continue to next step", "next", "weiter", "review your application", "review"):
+        assert not _EASY_APPLY_SUBMIT_RE.search(label)
