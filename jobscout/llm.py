@@ -1,6 +1,6 @@
 """Provider-agnostic LLM wrapper.
 
-Choose backend via env var `LLM_PROVIDER` (default `anthropic`). Add a new provider
+Choose backend via env var `LLM_PROVIDER` (default `gemini`). Add a new provider
 by writing a `_call_*` function with signature `(model, system, user, max_tokens) -> str`
 and registering it in `_PROVIDERS`. The public `call_text` / `call_json` API is
 identical regardless of backend.
@@ -97,7 +97,7 @@ def _retryable_excs() -> tuple[type[BaseException], ...]:
 
 
 def _provider_name() -> str:
-    return os.environ.get("LLM_PROVIDER", "anthropic").lower()
+    return os.environ.get("LLM_PROVIDER", "gemini").lower()
 
 
 _RATE_LIMIT_RETRY_DELAY_RE = re.compile(r"'retryDelay':\s*'(\d+)s'")
