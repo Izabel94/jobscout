@@ -227,16 +227,34 @@ def render(listing: dict[str, Any]) -> None:
 
             draft = get_latest_draft_for_listing(listing["id"]) if listing.get("id") else None
             if draft:
+                st.caption(
+                    f"model `{draft.get('model', '?')}` · "
+                    f"created {str(draft.get('created_at', '?'))[:19].replace('T', ' ')}"
+                )
+                if st.button("↻ Re-draft (replaces what's shown below)", key=f"redraft-{listing['id']}"):
+                    from jobscout.draft import draft_one
+                    from jobscout.models import Listing
+
+                    with st.spinner("calling LLM…"):
+                        try:
+                            draft_one(Listing.model_validate(listing))
+                            st.success("re-drafted")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"re-draft failed: {e}")
+
                 st.markdown("**Draft cover letter**")
                 edited = st.text_area(
                     "Draft body",
                     value=draft.get("body") or "",
-                    key=f"draft-{listing['id']}",
+                    key=f"body-{listing['id']}-{draft['id']}",
                     height=150,
                     label_visibility="collapsed",
                 )
                 if edited != (draft.get("body") or ""):
                     st.caption("Edited (save on apply — Phase 4)")
+                st.markdown("**Adapted CV (markdown)**")
+                st.code(draft.get("adapted_cv") or "", language="markdown")
             else:
                 st.caption("No draft generated yet — run `make draft` after scoring.")
 
