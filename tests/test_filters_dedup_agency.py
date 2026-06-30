@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from jobscout.filters import duplicate_ids
+from jobscout.filters import duplicate_ids, is_media_agency, media_agency_ids
 from jobscout.models import Listing, Source
 
 
@@ -43,3 +43,23 @@ def test_duplicate_ids_keeps_distinct_and_ignores_blank_keys():
     b = _listing(lid="b", title="Role B", company="Acme")
     nocompany = _listing(lid="n", title="Role A", company=None)
     assert duplicate_ids([a, b, nocompany]) == []
+
+
+def test_is_media_agency_denylist_and_keywords():
+    assert is_media_agency(_listing(lid="1", title="T", company="Cordes Consulting"))
+    assert is_media_agency(_listing(lid="2", title="T", company="Publicis Media Germany"))
+    assert is_media_agency(_listing(lid="3", title="T", company="Remazing Nova"))
+    assert is_media_agency(_listing(lid="4", title="T", company="Müller Werbeagentur GmbH"))
+    assert is_media_agency(_listing(lid="5", title="T", company="Acme Digital Agency"))
+
+
+def test_is_media_agency_keeps_inhouse_and_blank():
+    assert not is_media_agency(_listing(lid="1", title="T", company="Volkswagen"))
+    assert not is_media_agency(_listing(lid="2", title="T", company="adjoe"))
+    assert not is_media_agency(_listing(lid="3", title="T", company=None))
+
+
+def test_media_agency_ids_filters_list():
+    agency = _listing(lid="a", title="T", company="Zenith Deutschland")
+    inhouse = _listing(lid="b", title="T", company="Tchibo GmbH")
+    assert media_agency_ids([agency, inhouse]) == ["a"]
