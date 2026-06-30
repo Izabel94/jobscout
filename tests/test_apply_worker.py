@@ -27,7 +27,9 @@ def fake_render_cv(monkeypatch, tmp_path):
         out.write_bytes(b"%PDF-1.4 stub")
         return out
     monkeypatch.setattr("jobscout.apply.worker._render_cv_pdf", lambda md_, **kw: tmp_path / "cv.pdf")
+    monkeypatch.setattr("jobscout.apply.worker._render_cover_letter_pdf", lambda md_, **kw: tmp_path / "cl.pdf")
     (tmp_path / "cv.pdf").write_bytes(b"%PDF-1.4 stub")
+    (tmp_path / "cl.pdf").write_bytes(b"%PDF-1.4 stub")
     return tmp_path / "cv.pdf"
 
 
@@ -160,6 +162,7 @@ def test_process_one_flips_apply_method_on_easy_apply_after_click(monkeypatch):
     monkeypatch.setattr(worker, "_fetch_latest_draft",
                         lambda _: {"id": "d", "body": "b", "adapted_cv": "c"})
     monkeypatch.setattr(worker, "_render_cv_pdf", lambda *a, **kw: Path("/tmp/cv.pdf"))
+    monkeypatch.setattr(worker, "_render_cover_letter_pdf", lambda *a, **kw: Path("/tmp/cl.pdf"))
 
     def _raise(**_kw):
         raise external_ats.EasyApplyAfterClickError("landed on /jobs/easyApply/")
@@ -197,6 +200,7 @@ def _wire_outcome(monkeypatch, outcome_result):
     monkeypatch.setattr(worker, "_fetch_latest_draft",
                         lambda _: {"id": "draft-1", "body": "b", "adapted_cv": "c"})
     monkeypatch.setattr(worker, "_render_cv_pdf", lambda *a, **kw: Path("/tmp/cv.pdf"))
+    monkeypatch.setattr(worker, "_render_cover_letter_pdf", lambda *a, **kw: Path("/tmp/cl.pdf"))
     monkeypatch.setattr("jobscout.apply.external_ats.apply", lambda **kw: outcome_result)
 
     spy: dict[str, object] = {}

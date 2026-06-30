@@ -129,6 +129,21 @@ def _render_cv_pdf(cv_markdown: str, **_kwargs: object) -> Path:
     return out
 
 
+def _render_cover_letter_pdf(cover_letter: str) -> Path:
+    """Render the cover letter to a PDF, for forms that want it as a file upload
+    rather than a textarea."""
+    from jobscout.cv_render import cover_letter_to_pdf
+
+    suffix = secrets.token_hex(4)
+    out = Path(tempfile.gettempdir()) / f"{_candidate_name_slug()}_anschreiben_{suffix}.pdf"
+    page = _open_render_tab()
+    try:
+        cover_letter_to_pdf(cover_letter, out, page=page)
+    finally:
+        _close_render_tab(page)
+    return out
+
+
 def _record_submission_and_mark_done(request_id: str, listing_id: str, draft_id: str) -> None:
     record_submission(listing_id, draft_id, channel="external_apply", notes=None)
     mark_apply_request_done(request_id, executed_draft_id=draft_id, notes=None)
@@ -178,6 +193,7 @@ def process_one(row: dict[str, Any]) -> None:
             raise RuntimeError(f"no draft for listing {row['listing_id']}")
 
         cv_pdf_path = _render_cv_pdf(draft["adapted_cv"])
+        cover_letter_pdf_path = _render_cover_letter_pdf(draft["body"])
 
         from jobscout.apply import external_ats
 
@@ -189,6 +205,7 @@ def process_one(row: dict[str, Any]) -> None:
                 listing_title=listing.get("title") or "",
                 listing_description=listing.get("description") or "",
                 adapted_cv_md=draft["adapted_cv"],
+                cover_letter_pdf_path=cover_letter_pdf_path,
             )
         except external_ats.EasyApplyAfterClickError:
             _flip_listing_to_easy_apply(listing["id"])
