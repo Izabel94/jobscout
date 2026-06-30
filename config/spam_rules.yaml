@@ -43,32 +43,6 @@ mlm_companies:
   - PM International
   - Forever Living
 
-# Media / marketing agencies to drop (Julian wants in-house roles, not agency
-# work). Matched as a case-insensitive substring of the company NAME only —
-# never the description — so a role that merely mentions agencies isn't dropped.
-# Seeded from the real corpus; prune/extend as Julian reviews.
-media_agencies:
-  - Cordes Consulting
-  - Publicis Media
-  - Zenith
-  - dieseo
-  - Remazing
-  - Front Row
-
-# Generic agency tells in a company NAME catch agencies not yet listed above —
-# media/marketing plus staffing/recruiting firms (Julian wants in-house roles).
-media_agency_company_keywords:
-  - agentur
-  - agency
-  - personalvermittlung
-  - personaldienstleist
-  - personalberatung
-  - zeitarbeit
-  - arbeitnehmerüberlassung
-  - recruiting
-  - staffing
-  - headhunt
-
 werkstudent_overload_threshold_hours: 20
 
 spam_score_drop_threshold: 5

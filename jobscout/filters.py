@@ -112,22 +112,6 @@ def _company(listing: Listing) -> str:
     return str(raw.get("company") or "") if isinstance(raw, dict) else ""
 
 
-def is_media_agency(listing: Listing) -> bool:
-    """True when the company name matches a known media agency or a generic
-    agency tell. Company name only — a role mentioning agencies isn't dropped."""
-    rules = load_spam_rules()
-    company = _norm(_company(listing))
-    if not company:
-        return False
-    if any(_norm(a) in company for a in rules.get("media_agencies", [])):
-        return True
-    return any(kw.lower() in company for kw in rules.get("media_agency_company_keywords", []))
-
-
-def media_agency_ids(listings: list[Listing]) -> list[str]:
-    return [str(listing.id) for listing in listings if listing.id and is_media_agency(listing)]
-
-
 def duplicate_ids(listings: list[Listing]) -> list[str]:
     """Ids to reject so each (title, company) keeps one row. Indeed re-scrapes
     the same posting under different source_ids across runs, slipping past the
