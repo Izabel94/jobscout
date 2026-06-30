@@ -18,6 +18,7 @@ import contextlib
 import json
 import os
 import random
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -68,6 +69,91 @@ def _assert_not_easy_apply(page: Page) -> None:
     url = (page.url or "").lower()
     if _EASY_APPLY_HOST_FRAGMENT in url:
         raise EasyApplyAfterClickError(f"still on LinkedIn at form step (Easy Apply): {page.url}")
+
+
+_EASY_APPLY_SUBMIT_RE = re.compile(r"submit application|bewerbung absenden|absenden", re.I)
+_MAX_EASY_APPLY_STEPS = 8
+
+_EASY_APPLY_PRIMARY_JS = """() => {
+  const modal = document.querySelector('.artdeco-modal, [role="dialog"]');
+  if (!modal) return null;
+  const btns = [...modal.querySelectorAll('button')];
+  const primary = btns.find(b => /artdeco-button--primary/.test(b.className)) || btns.find(b => {
+    const t = ((b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '')).toLowerCase();
+    return /continue to next step|review|submit application|weiter|absenden|.berpr.fen/.test(t);
+  });
+  if (!primary) return null;
+  primary.setAttribute('data-js-ea', '1');
+  return ((primary.getAttribute('aria-label') || primary.textContent || '').trim().toLowerCase());
+}"""
+
+
+def _easy_apply_primary(page: Page) -> tuple[str, str] | None:
+    """Mark the Easy Apply modal's primary footer button and return its
+    (selector, lowercased label), or None if there's no modal/button."""
+    label = page.evaluate(_EASY_APPLY_PRIMARY_JS)
+    if not label:
+        return None
+    return "button[data-js-ea='1']", str(label)
+
+
+def _drive_easy_apply(
+    page: Page,
+    *,
+    cv_pdf_path: Path | None,
+    proposal: str,
+    adapted_cv_md: str,
+    listing_title: str,
+    listing_description: str,
+    cover_letter_pdf_path: Path | None,
+    submit_state: object,
+) -> ApplyResult:
+    """Walk LinkedIn's in-app Easy Apply modal: fill the visible step, click the
+    footer button to advance, and stop at the Submit step for the user to review
+    and send. Never submits. Bounded by _MAX_EASY_APPLY_STEPS."""
+    cv_attached = False
+    seen_field_ids: set[str] = set()
+    for step in range(1, _MAX_EASY_APPLY_STEPS + 1):
+        fields = _enumerate_fields(page)
+        targets = fields if step == 1 else _select_round_targets(fields, seen_field_ids)
+        if targets:
+            try:
+                actions = _ask_llm_for_actions(
+                    fields=targets,
+                    cover_letter=proposal,
+                    adapted_cv=adapted_cv_md,
+                    listing_title=listing_title,
+                    listing_description=listing_description,
+                )
+            except Exception as e:
+                print(f"  Easy Apply step {step}: LLM mapping failed ({e})", flush=True)
+                actions = []
+            actions.sort(key=lambda a: _ACTION_PRIORITY.get((a.get("action") or "").lower(), 1))
+            for action in actions:
+                act = (action.get("action") or "").lower()
+                if act == "attach" and cv_attached:
+                    continue
+                ok, note = _apply_action(page, action, cv_pdf_path, proposal, cover_letter_pdf_path)
+                print(f"  [{'OK' if ok else 'SKIP'}] {action.get('selector', '?')} {act} {note}", flush=True)
+                if ok and act == "attach":
+                    cv_attached = True
+            seen_field_ids.update(str(f["id"]) for f in targets if f.get("id"))
+            page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
+
+        primary = _easy_apply_primary(page)
+        if primary is None:
+            print(f"  Easy Apply step {step}: no footer button — stopping for manual review.", flush=True)
+            break
+        selector, label = primary
+        if _EASY_APPLY_SUBMIT_RE.search(label):
+            print("Easy Apply: reached the submit step — filled, leaving for you to review and submit.", flush=True)
+            return _await_user_submit(page, submit_state)
+        print(f"  Easy Apply step {step}: advancing ({label!r})", flush=True)
+        with contextlib.suppress(Exception):
+            page.locator(selector).first.click()
+        page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
+
+    return _await_user_submit(page, submit_state)
 
 
 _PAGE_THINK_SECONDS = (10.0, 18.0)
@@ -869,7 +955,22 @@ def _run(
         page = _walk_to_form(context, page)
         print(f"Form page: {page.url}", flush=True)
 
-        _assert_not_easy_apply(page)
+        try:
+            _assert_not_easy_apply(page)
+        except EasyApplyAfterClickError:
+            if os.environ.get("JOBSCOUT_EASY_APPLY") == "1" and _easy_apply_primary(page) is not None:
+                print("Easy Apply detected — driving the in-app modal (fills, stops at submit).", flush=True)
+                return _drive_easy_apply(
+                    page,
+                    cv_pdf_path=cv_pdf_path,
+                    proposal=proposal,
+                    adapted_cv_md=adapted_cv_md,
+                    listing_title=listing_title,
+                    listing_description=listing_description,
+                    cover_letter_pdf_path=cover_letter_pdf_path,
+                    submit_state=_install_submit_detector(context, page),
+                )
+            raise
 
         # Still on a login/register page after walking the apply CTAs -> the
         # application is behind a sign-in we can't pass. Don't fill the login
