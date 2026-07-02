@@ -60,15 +60,36 @@ class ApplyResult:
 
 _EASY_APPLY_HOST_FRAGMENT = "linkedin.com"
 
+# A genuine in-app Easy Apply has an actually-open modal dialog with form
+# controls (and no password — that's a login). Host alone is NOT enough: an
+# offsite job whose safety/go redirect is gated behind a LinkedIn sign-in also
+# stays on linkedin.com, and treating that as Easy Apply permanently mislabels
+# the listing. Verified live against an offsite Mercor job on 2026-07-02.
+_EASY_APPLY_MODAL_JS = """() => {
+  if (/\\/jobs\\/[^/]+\\/apply\\b|easyapply/i.test(location.pathname)) return true;
+  const modal = document.querySelector('.jobs-easy-apply-modal, .artdeco-modal, [role="dialog"]');
+  if (!modal) return false;
+  const r = modal.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return false;
+  if (modal.querySelector('input[type="password"]')) return false;
+  return !!modal.querySelector('input, select, textarea, [contenteditable="true"]');
+}"""
+
+
+def _easy_apply_modal_open(page: Page) -> bool:
+    """True only when a real Easy Apply modal/overlay is open."""
+    with contextlib.suppress(Exception):
+        return bool(page.evaluate(_EASY_APPLY_MODAL_JS))
+    return False
+
 
 def _assert_not_easy_apply(page: Page) -> None:
-    # A genuine external apply redirects off LinkedIn to the employer's ATS.
-    # If we've reached the form and are still on linkedin.com, it's the in-app
-    # apply (classic /jobs/easyApply/ or the SDUI /apply overlay, which keeps the
-    # /jobs/view/<id>/ URL) — not fillable, so surface it for manual apply.
+    # Raise only for a genuinely-open in-app apply (modal or /apply overlay).
+    # Still-on-LinkedIn WITHOUT a modal is a sign-in gate, handled by the
+    # caller as login_wall — not Easy Apply.
     url = (page.url or "").lower()
-    if _EASY_APPLY_HOST_FRAGMENT in url:
-        raise EasyApplyAfterClickError(f"still on LinkedIn at form step (Easy Apply): {page.url}")
+    if _EASY_APPLY_HOST_FRAGMENT in url and _easy_apply_modal_open(page):
+        raise EasyApplyAfterClickError(f"in-app Easy Apply open at form step: {page.url}")
 
 
 _EASY_APPLY_SUBMIT_RE = re.compile(r"submit application|bewerbung absenden|absenden", re.I)
@@ -972,6 +993,16 @@ def _run(
                 )
             raise
 
+        # Still on linkedin.com with NO modal -> LinkedIn is gating the offsite
+        # redirect behind a sign-in. Not Easy Apply — a login wall.
+        if _EASY_APPLY_HOST_FRAGMENT in (page.url or "").lower():
+            print(
+                "Blocked by LinkedIn before the offsite form — sign into LinkedIn in the "
+                "apply Chrome, then re-queue this listing.",
+                flush=True,
+            )
+            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
+
         # Still on a login/register page after walking the apply CTAs -> the
         # application is behind a sign-in we can't pass. Don't fill the login
         # form; flag it for manual apply.
@@ -1032,6 +1063,10 @@ def _run(
                         advances += 1
                         print(f"  advanced to next step (#{advances})", flush=True)
                         _assert_not_easy_apply(page)  # a step may route to Easy Apply
+                        # Routed back onto LinkedIn without a modal -> sign-in gate.
+                        if _EASY_APPLY_HOST_FRAGMENT in (page.url or "").lower():
+                            print("  advanced back onto LinkedIn — sign-in gate; flagging for manual apply.", flush=True)
+                            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
                         # A login/register can appear mid-flow (e.g. join.com asks
                         # for a password once the email is recognised). Don't stall
                         # on it — flag for manual apply.
