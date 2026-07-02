@@ -215,13 +215,23 @@ def render(listing: dict[str, Any]) -> None:
         if badges_html:
             st.markdown(badges_html, unsafe_allow_html=True)
 
-        with st.expander("View detail + draft", expanded=False):
-            marked_key = f"marked-{listing.get('id', '')}"
-            if not seen and not st.session_state.get(marked_key):
-                if listing.get("id"):
-                    mark_listing_viewed(listing["id"])
-                st.session_state[marked_key] = True
-
+        detail = st.expander(
+            "View detail + draft",
+            expanded=False,
+            key=f"exp-{listing.get('id', '')}",
+            on_change="rerun",
+        )
+        # Mark viewed only when the expander is actually OPENED. Streamlit runs
+        # an expander's body on every render even while collapsed, so marking
+        # inside it turned every rendered card 'viewed'. `.open` + on_change=
+        # 'rerun' makes the open state observable each run.
+        marked_key = f"marked-{listing.get('id', '')}"
+        if detail.open and not seen and not st.session_state.get(marked_key):
+            if listing.get("id"):
+                mark_listing_viewed(listing["id"])
+            st.session_state[marked_key] = True
+            st.rerun()
+        with detail:
             rationale = listing.get("score_rationale") or ""
             if rationale:
                 st.markdown(
