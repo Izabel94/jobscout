@@ -152,6 +152,21 @@ _CSS = """
   div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button:hover {
     background: #fecaca !important;
   }
+
+  /* Card Remove button — red so it reads as an actionable delete, not a
+     disabled secondary button. Same marker+:has() mechanism as the chips, but
+     descendant (not >) selector: the help= tooltip wraps the button in
+     stTooltipHoverTarget divs inside stButton. */
+  .jobscout-remove-marker { display: none; }
+  div[data-testid="stColumn"]:has(.jobscout-remove-marker) [data-testid="stButton"] button {
+    color: #b91c1c !important;
+    border: 1px solid #fecaca !important;
+  }
+  div[data-testid="stColumn"]:has(.jobscout-remove-marker) [data-testid="stButton"] button:hover {
+    color: #ffffff !important;
+    background: #dc2626 !important;
+    border-color: #dc2626 !important;
+  }
 </style>
 """
 

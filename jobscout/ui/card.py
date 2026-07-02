@@ -139,7 +139,7 @@ def render(listing: dict[str, Any]) -> None:
         if seen:
             st.markdown('<span class="jobscout-viewed-marker"></span>', unsafe_allow_html=True)
 
-        col_title, col_score = st.columns([5, 1])
+        col_title, col_score, col_remove = st.columns([5, 1, 1])
         with col_title:
             raw = listing.get("raw") or {}
             favicon = favicon_url(
@@ -158,6 +158,19 @@ def render(listing: dict[str, Any]) -> None:
                 f'<div class="{score_pill_class(score)}">{score_str}</div>',
                 unsafe_allow_html=True,
             )
+        with col_remove:
+            # Manual fallback for listings the freshness sweep misses or that
+            # are inappropriate. EXPIRED is terminal and hidden by the pipeline
+            # query; the worker drops any queued apply for it.
+            st.markdown('<span class="jobscout-remove-marker"></span>', unsafe_allow_html=True)
+            if st.button(
+                "✕ Remove",
+                key=f"remove-{listing.get('id', '')}",
+                help="Hide this listing (expired or not relevant).",
+            ) and listing.get("id"):
+                update_listing_status(listing["id"], ListingStatus.EXPIRED)
+                st.toast("Listing removed")
+                st.rerun()
 
         raw = listing.get("raw") or {}
         company = (raw.get("company") if isinstance(raw, dict) else "") or ""
