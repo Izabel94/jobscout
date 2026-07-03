@@ -901,25 +901,68 @@ def _find_or_open_target_page(context: BrowserContext, ats_url: str) -> Page:
 _SUBMIT_WAIT_SECONDS = 600
 
 
+_SUBMIT_POLL_SECONDS = 2.0
+
+
+def _current_url(page: Page) -> str | None:
+    with contextlib.suppress(Exception):
+        return page.url
+    return None
+
+
+def _reached_confirmation(page: Page) -> bool:
+    """DOM-aware check: has the page become a submission confirmation? Catches
+    real submits the click listener misses (button text not in keywords, submit
+    inside an iframe, or a late click). LLM-backed; any failure returns False so
+    we never record a phantom submission."""
+    from jobscout.apply.page_state import PageState, classify_page
+
+    with contextlib.suppress(Exception):
+        return classify_page(page).state == PageState.SUBMITTED
+    return False
+
+
+def _blocked_result(page: Page) -> ApplyResult:
+    """Map a page with no fillable form to an outcome by READING it, not by
+    assuming a login wall: private/closed -> unavailable, already-applied ->
+    submitted, otherwise login_wall (the prior default)."""
+    from jobscout.apply.page_state import PageState, classify_page
+
+    a = classify_page(page)
+    if a.state == PageState.UNAVAILABLE:
+        print(f"  page unavailable ({a.reason}) — flagging for manual apply.", flush=True)
+        return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="unavailable")
+    if a.state == PageState.SUBMITTED:
+        print(f"  already applied ({a.reason}).", flush=True)
+        return ApplyResult(ApplyOutcome.SUBMITTED)
+    print(f"  no fillable form ({a.state.value}: {a.reason}) — flagging login_wall.", flush=True)
+    return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
+
+
 def _await_user_submit(
     page: Page, submit_state: dict[str, Any], max_wait_seconds: float = _SUBMIT_WAIT_SECONDS
 ) -> ApplyResult:
     """Leave the filled tab open for the user to review and submit. Record a
-    submission ONLY when a final-submit click is observed; closing the tab — or
-    walking away — without that click is FILLED_NO_SUBMIT, never a phantom
-    submission."""
+    submission when EITHER a final-submit click is seen OR the page navigates to
+    a confirmation ('application received') — the latter catches clicks the
+    listener misses. Closing the tab without either is FILLED_NO_SUBMIT, never a
+    phantom submission."""
     deadline = time.monotonic() + max_wait_seconds
+    last_url = _current_url(page)
     while time.monotonic() < deadline:
         if submit_state.get("clicked"):
             print("  submit click detected — recording submission", flush=True)
             return ApplyResult(ApplyOutcome.SUBMITTED)
-        try:
-            page.wait_for_event("close", timeout=1_000)
-        except PlaywrightTimeoutError:
-            continue
-        outcome = ApplyOutcome.SUBMITTED if submit_state.get("clicked") else ApplyOutcome.FILLED_NO_SUBMIT
-        print(f"  tab closed — outcome={outcome.value}", flush=True)
-        return ApplyResult(outcome)
+        if page.is_closed():
+            print("  tab closed before submit — marking attempted", flush=True)
+            return ApplyResult(ApplyOutcome.FILLED_NO_SUBMIT)
+        cur = _current_url(page)
+        if cur and cur != last_url:
+            last_url = cur
+            if _reached_confirmation(page):
+                print("  confirmation page detected — recording submission", flush=True)
+                return ApplyResult(ApplyOutcome.SUBMITTED)
+        time.sleep(_SUBMIT_POLL_SECONDS)
     print("  no submit within wait window — leaving tab open, marking attempted", flush=True)
     return ApplyResult(ApplyOutcome.FILLED_NO_SUBMIT)
 
@@ -1041,13 +1084,11 @@ def _run(
             if round_n == 1:
                 print(f"Round 1: enumerated {len(fields)} field(s)", flush=True)
                 if not fields:
-                    print(
-                        "No fillable form fields detected after walking apply CTAs. "
-                        "The page may be a login wall, an account-creation step, "
-                        "or a non-standard widget. Flagging for manual apply.",
-                        flush=True,
-                    )
-                    return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
+                    # No fields — could be a login wall, but also a private /
+                    # closed / already-applied page. Read the page instead of
+                    # assuming a login wall.
+                    print("No fillable form fields detected — classifying the page.", flush=True)
+                    return _blocked_result(page)
                 targets = fields
             else:
                 targets = _select_round_targets(fields, seen_field_ids)
