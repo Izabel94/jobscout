@@ -204,21 +204,6 @@ _PROMPT_PATH = _PROMPTS_DIR / "ats_form_fill.v1.md"
 # Bundesagentur externeUrl → job-board listing → employer form chain — 3 hops covers it.
 _MAX_APPLY_HOPS = 3
 
-_APPLY_CTA_KEYWORDS = (
-    "jetzt bewerben",
-    "bewerben",
-    "apply now",
-    "apply for this",
-    "apply",
-    "submit application",
-    "start application",
-    "bewerbung",
-)
-
-# "Apply later" / save-for-later decoys — never the real apply CTA (join.com
-# shows a "Später bewerben" email-capture next to "Jetzt bewerben").
-_APPLY_LATER_KEYWORDS = ("später", "spater", "later", "merken", "save")
-
 # SSO / social-login buttons — never click these to advance (they open a
 # third-party auth popup). e.g. join.com's "Weiter mit Google".
 _SSO_KEYWORDS = ("google", "apple", "facebook", "linkedin", "microsoft", "sso", "single sign")
@@ -682,34 +667,6 @@ def _dismiss_consent_banner(page: Page) -> bool:
     )
 
 
-def _find_apply_cta(page: Page) -> str | None:
-    """Return href of the first visible Apply / Bewerben anchor.
-
-    Skips elements with long text — on LinkedIn the "similar jobs" cards are
-    `<a>` wrappers whose textContent includes an "Easy Apply" badge, which
-    would otherwise match. The real apply button has short text ("Bewerben").
-    """
-    return page.evaluate(
-        """(keywords) => {
-          const candidates = Array.from(document.querySelectorAll('a, button, [role="button"]'));
-          for (const el of candidates) {
-            const own = (el.textContent || '').trim();
-            if (own.length > 60) continue;  // skip job-card wrappers
-            const text = (own + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase().trim();
-            if (!text) continue;
-            const matches = keywords.some(k => text.includes(k));
-            if (!matches) continue;
-            const r = el.getBoundingClientRect();
-            const cs = getComputedStyle(el);
-            if (r.width === 0 || r.height === 0 || cs.display === 'none' || cs.visibility === 'hidden') continue;
-            return el.href || null;
-          }
-          return null;
-        }""",
-        list(_APPLY_CTA_KEYWORDS),
-    )
-
-
 def _resolve_cta_href(href: str) -> str:
     """Unwrap LinkedIn's `safety/go/?url=<encoded>` redirect to the real
     destination, skipping the "you're leaving LinkedIn" interstitial. Other
@@ -791,65 +748,29 @@ def _advance_to_next_step(page: Page) -> bool:
             )
 
 
-def _click_apply_cta(page: Page) -> bool:
-    """Click a visible Apply/Bewerben CTA that has no link to follow (a button,
-    or an <a> with no usable href) — e.g. join.com's 'Jetzt bewerben' which
-    starts the apply flow via JS. Skips 'apply later' decoys and SSO buttons.
-    Direct-nav by href is preferred; this is the fallback. Returns True if it
-    clicked one (the flow usually navigates the same tab)."""
-    marked = page.evaluate(
-        """(kw) => {
-          const has = (t, list) => list.some(k => t.includes(k));
-          for (const el of document.querySelectorAll('a, button, [role="button"]')) {
-            const own = (el.textContent || '').trim();
-            if (!own || own.length > 60) continue;
-            const t = (own + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
-            if (!has(t, kw.apply)) continue;
-            if (has(t, kw.later) || has(t, kw.sso)) continue;
-            if (el.tagName === 'A' && el.href && !el.href.endsWith('#')) continue;  // real link -> direct-nav handles it
-            const r = el.getBoundingClientRect();
-            const cs = getComputedStyle(el);
-            if (r.width === 0 || r.height === 0 || cs.display === 'none' || cs.visibility === 'hidden') continue;
-            el.setAttribute('data-js-cta', '1');
-            return true;
-          }
-          return false;
-        }""",
-        {"apply": list(_APPLY_CTA_KEYWORDS), "later": list(_APPLY_LATER_KEYWORDS), "sso": list(_SSO_KEYWORDS)},
-    )
-    if not marked:
-        return False
-    try:
-        page.locator('[data-js-cta]').first.click(timeout=5_000)
-        page.wait_for_timeout(2_500)
-        return True
-    except (PlaywrightTimeoutError, Exception) as e:
-        print(f"  apply-button click failed: {e}", flush=True)
-        return False
-    finally:
-        with contextlib.suppress(Exception):
-            page.evaluate("() => document.querySelectorAll('[data-js-cta]').forEach(e => e.removeAttribute('data-js-cta'))")
-
-
 def _walk_to_form(context: BrowserContext, page: Page) -> Page:
-    """Follow Apply CTAs until the page is an actual application form, up to
-    _MAX_APPLY_HOPS. A page with only stray fields (a job-view, or an
-    'apply later' email box) but a visible apply CTA is NOT the form — follow
-    the link, or click the button when there's no link."""
+    """Follow the apply CTA until the page is an actual application form, up to
+    _MAX_APPLY_HOPS. The CTA is chosen by the LLM from the page's real controls
+    (DOM-aware — it avoids sign-in / save / similar-jobs decoys) rather than a
+    keyword scan. A link is direct-navigated (unwrapping LinkedIn's safety/go);
+    a button is clicked."""
+    from jobscout.apply.page_state import choose_apply_cta
+
     for hop in range(_MAX_APPLY_HOPS):
         fields = _enumerate_fields(page)
         # A login/register widget (password field) is not the application form.
         if _looks_like_form(fields) and not _has_password_field(page):
             return page
-        cta_href = _find_apply_cta(page)
-        if cta_href:
-            cta_href = _resolve_cta_href(cta_href)
-            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {cta_href[:90]}", flush=True)
-            # Direct nav beats clicking — JS handlers often call window.open which
-            # is blocked for non-trusted events.
+        cta = choose_apply_cta(page)
+        if not cta:
+            return page
+        href = cta.get("href")
+        if cta.get("kind") == "a" and href and not href.endswith("#"):
+            target = _resolve_cta_href(href)
+            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: following apply CTA -> {target[:90]}", flush=True)
             try:
                 new_page = context.new_page()
-                new_page.goto(cta_href, wait_until="domcontentloaded", timeout=30_000)
+                new_page.goto(target, wait_until="domcontentloaded", timeout=30_000)
                 new_page.wait_for_timeout(2_000)
                 if hop > 0:
                     with contextlib.suppress(Exception):
@@ -861,11 +782,14 @@ def _walk_to_form(context: BrowserContext, page: Page) -> Page:
                 print(f"  hop failed: {e}", flush=True)
                 return page
             continue
-        # No link to follow — try clicking a button CTA (JS-driven apply flow).
-        if _click_apply_cta(page):
-            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: clicked apply button -> {page.url[:90]}", flush=True)
+        try:
+            page.locator(cta["selector"]).first.click(timeout=5_000)
+            page.wait_for_timeout(2_500)
+            print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: clicked apply CTA -> {page.url[:90]}", flush=True)
             continue
-        return page
+        except (PlaywrightTimeoutError, Exception) as e:
+            print(f"  apply-CTA click failed: {e}", flush=True)
+            return page
     return page
 
 
@@ -993,6 +917,97 @@ def apply(
         )
 
 
+@dataclass
+class FillResult:
+    """Outcome of a DOM-aware form fill (no submit)."""
+
+    applied: int = 0
+    total_actions: int = 0
+    rounds: int = 0
+    no_fields: bool = False  # round 1 found nothing to fill
+    login_wall: bool = False  # a sign-in gate appeared mid-flow
+
+
+def fill_open_form(
+    context: BrowserContext,
+    page: Page,
+    *,
+    proposal: str,
+    cv_pdf_path: Path | None,
+    adapted_cv_md: str = "",
+    listing_title: str = "",
+    listing_description: str = "",
+    cover_letter_pdf_path: Path | None = None,
+) -> FillResult:
+    """DOM-aware iterative fill of an already-open application form. Enumerates
+    the visible fields, asks the LLM to map them to actions, applies them, and
+    re-enumerates for conditional / multi-page fields — NO hardcoded field
+    selectors. Never submits. Raises EasyApplyAfterClickError if a step routes
+    into LinkedIn's in-app apply; sets login_wall on a mid-flow sign-in gate."""
+    seen_field_ids: set[str] = set()
+    total_applied = total_actions = advances = round_n = 0
+    cv_attached = False
+    for round_n in range(1, _MAX_ROUNDS + 1):
+        fields = _enumerate_fields(page)
+        if round_n == 1:
+            print(f"Round 1: enumerated {len(fields)} field(s)", flush=True)
+            if not fields:
+                return FillResult(no_fields=True, rounds=round_n)
+            targets = fields
+        else:
+            targets = _select_round_targets(fields, seen_field_ids)
+            print(
+                f"Round {round_n}: enumerated {len(fields)} field(s), "
+                f"targeting {len(targets)} (new or now-empty)",
+                flush=True,
+            )
+            if not targets:
+                if advances < _MAX_PAGE_ADVANCES and _advance_to_next_step(page):
+                    advances += 1
+                    print(f"  advanced to next step (#{advances})", flush=True)
+                    _assert_not_easy_apply(page)  # a step may route to Easy Apply
+                    if _EASY_APPLY_HOST_FRAGMENT in (page.url or "").lower():
+                        print("  advanced back onto LinkedIn — sign-in gate.", flush=True)
+                        return FillResult(applied=total_applied, total_actions=total_actions,
+                                          rounds=round_n, login_wall=True)
+                    if _has_password_field(page):
+                        print("  hit a login mid-flow (password field).", flush=True)
+                        return FillResult(applied=total_applied, total_actions=total_actions,
+                                          rounds=round_n, login_wall=True)
+                    continue
+                break
+        try:
+            actions = _ask_llm_for_actions(
+                fields=targets,
+                cover_letter=proposal,
+                adapted_cv=adapted_cv_md,
+                listing_title=listing_title,
+                listing_description=listing_description,
+            )
+        except Exception as e:
+            print(f"LLM mapping failed in round {round_n} ({e}); aborting round loop", flush=True)
+            break
+        seen_field_ids.update(str(f["id"]) for f in targets if f.get("id"))
+        total_actions += len(actions)
+        # Selects before types before attach (phone-country before number; CV last).
+        actions.sort(key=lambda a: _ACTION_PRIORITY.get((a.get("action") or "").lower(), 1))
+        print(f"Round {round_n}: LLM produced {len(actions)} action(s)", flush=True)
+        for action in actions:
+            act = (action.get("action") or "").lower()
+            if act == "attach" and cv_attached:
+                print(f"  [SKIP] {action.get('selector', '?')}  action=attach  CV already attached", flush=True)
+                continue
+            _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
+            ok, note = _apply_action(page, action, cv_pdf_path, proposal, cover_letter_pdf_path)
+            print(f"  [{'OK' if ok else 'SKIP'}] {action.get('selector', '?')}  action={action.get('action')}  {note}", flush=True)
+            if ok and act != "skip":
+                total_applied += 1
+            if ok and act == "attach":
+                cv_attached = True
+        page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
+    return FillResult(applied=total_applied, total_actions=total_actions, rounds=round_n)
+
+
 def _run(
     p: Playwright,
     cdp_url: str,
@@ -1015,6 +1030,19 @@ def _run(
         page.wait_for_timeout(2_000)
 
         print(f"On {page.url}", flush=True)
+
+        # DOM-aware pre-check: a closed / private / already-applied page has no
+        # form to reach — classify BEFORE hunting apply buttons, so we never
+        # click a sign-in/promo decoy on a dead listing and mislabel it.
+        from jobscout.apply.page_state import PageState, classify_page
+
+        pre = classify_page(page)
+        if pre.state == PageState.UNAVAILABLE:
+            print(f"Listing unavailable ({pre.reason}). Flagging for manual apply.", flush=True)
+            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="unavailable")
+        if pre.state == PageState.SUBMITTED:
+            print(f"Already applied ({pre.reason}).", flush=True)
+            return ApplyResult(ApplyOutcome.SUBMITTED)
 
         page = _walk_to_form(context, page)
         print(f"Form page: {page.url}", flush=True)
@@ -1065,96 +1093,19 @@ def _run(
 
         _think_pause(page, _PAGE_THINK_SECONDS, "page-load (LLM drafting)")
 
-        # Iterative fill — many ATS forms (React-based: Greenhouse, Softgarden,
-        # Lever) reveal conditional fields after earlier ones are filled
-        # (country → state, file upload → autoparsed details) AND re-render
-        # previously-filled controls back to empty. A single enumerate-then-fill
-        # pass loses both classes. Loop: enumerate → LLM → fill → wait for
-        # re-renders → re-enumerate. Cap at _MAX_ROUNDS to stop runaways.
-        seen_field_ids: set[str] = set()
-        total_applied = 0
-        total_actions = 0
-        advances = 0
-        round_n = 0
-        cv_attached = False  # attach the CV once — some ATSes re-render the file
-        # input each round (new id), which would otherwise re-upload it.
-
-        for round_n in range(1, _MAX_ROUNDS + 1):
-            fields = _enumerate_fields(page)
-            if round_n == 1:
-                print(f"Round 1: enumerated {len(fields)} field(s)", flush=True)
-                if not fields:
-                    # No fields — could be a login wall, but also a private /
-                    # closed / already-applied page. Read the page instead of
-                    # assuming a login wall.
-                    print("No fillable form fields detected — classifying the page.", flush=True)
-                    return _blocked_result(page)
-                targets = fields
-            else:
-                targets = _select_round_targets(fields, seen_field_ids)
-                print(
-                    f"Round {round_n}: enumerated {len(fields)} field(s), "
-                    f"targeting {len(targets)} (new or now-empty)",
-                    flush=True,
-                )
-                if not targets:
-                    # Nothing left on this page — try advancing to the next step
-                    # of a multi-page form (safe-allowlisted; never submits).
-                    if advances < _MAX_PAGE_ADVANCES and _advance_to_next_step(page):
-                        advances += 1
-                        print(f"  advanced to next step (#{advances})", flush=True)
-                        _assert_not_easy_apply(page)  # a step may route to Easy Apply
-                        # Routed back onto LinkedIn without a modal -> sign-in gate.
-                        if _EASY_APPLY_HOST_FRAGMENT in (page.url or "").lower():
-                            print("  advanced back onto LinkedIn — sign-in gate; flagging for manual apply.", flush=True)
-                            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
-                        # A login/register can appear mid-flow (e.g. join.com asks
-                        # for a password once the email is recognised). Don't stall
-                        # on it — flag for manual apply.
-                        if _has_password_field(page):
-                            print("  hit a login mid-flow (password field) — flagging for manual apply.", flush=True)
-                            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
-                        continue
-                    break
-
-            try:
-                actions = _ask_llm_for_actions(
-                    fields=targets,
-                    cover_letter=proposal,
-                    adapted_cv=adapted_cv_md,
-                    listing_title=listing_title,
-                    listing_description=listing_description,
-                )
-            except Exception as e:
-                print(f"LLM mapping failed in round {round_n} ({e}); aborting round loop", flush=True)
-                break
-
-            seen_field_ids.update(str(f["id"]) for f in targets if f.get("id"))
-            total_actions += len(actions)
-            # Selects before types before attach (phone-country before number; CV last).
-            actions.sort(key=lambda a: _ACTION_PRIORITY.get((a.get("action") or "").lower(), 1))
-
-            print(f"Round {round_n}: LLM produced {len(actions)} action(s)", flush=True)
-            for action in actions:
-                act = (action.get("action") or "").lower()
-                if act == "attach" and cv_attached:
-                    print(f"  [SKIP] {action.get('selector', '?')}  action=attach  CV already attached", flush=True)
-                    continue
-                _think_pause(page, _FIELD_THINK_SECONDS, f"field {action.get('selector', '?')}")
-                ok, note = _apply_action(page, action, cv_pdf_path, proposal, cover_letter_pdf_path)
-                label_hint = action.get("selector", "?")
-                print(f"  [{'OK' if ok else 'SKIP'}] {label_hint}  action={action.get('action')}  {note}", flush=True)
-                if ok and act != "skip":
-                    total_applied += 1
-                if ok and act == "attach":
-                    cv_attached = True
-
-            # Wait for the page to render any conditional fields revealed by
-            # the fills (or to surface re-renders that cleared a previous fill).
-            page.wait_for_timeout(_INTER_ROUND_WAIT_MS)
-
+        fr = fill_open_form(
+            context, page,
+            proposal=proposal, cv_pdf_path=cv_pdf_path, adapted_cv_md=adapted_cv_md,
+            listing_title=listing_title, listing_description=listing_description,
+            cover_letter_pdf_path=cover_letter_pdf_path,
+        )
+        if fr.no_fields:
+            print("No fillable form fields detected — classifying the page.", flush=True)
+            return _blocked_result(page)
+        if fr.login_wall:
+            return ApplyResult(ApplyOutcome.NOT_FILLABLE, reason="login_wall")
         print(
-            f"Filled {total_applied}/{total_actions} fields across {round_n} round(s). "
+            f"Filled {fr.applied}/{fr.total_actions} fields across {fr.rounds} round(s). "
             "Review the form, fix anything the LLM skipped, then click Submit yourself.",
             flush=True,
         )

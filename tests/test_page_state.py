@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jobscout.apply.page_state import PageAssessment, PageState, classify_page, snapshot
+from jobscout.apply.page_state import PageAssessment, PageState, choose_apply_cta, classify_page, snapshot
 
 
 @pytest.fixture
@@ -91,3 +91,29 @@ def test_blocked_property():
     assert PageAssessment(PageState.UNAVAILABLE, "").blocked
     assert not PageAssessment(PageState.APPLICATION_FORM, "").blocked
     assert not PageAssessment(PageState.SUBMITTED, "").blocked
+
+
+class _CtaPage:
+    def evaluate(self, *_a, **_k):
+        return [
+            {"i": 0, "tag": "button", "text": "Sign in", "aria": "", "href": ""},
+            {"i": 1, "tag": "a", "text": "Bewerben", "aria": "Auf Firmenwebseite bewerben",
+             "href": "https://www.linkedin.com/safety/go/?url=https%3A%2F%2Facme.com"},
+        ]
+
+
+def test_choose_apply_cta_returns_marked_link():
+    with patch("jobscout.apply.page_state.call_json", return_value={"index": 1, "kind": "link"}):
+        cta = choose_apply_cta(_CtaPage())
+    assert cta == {"kind": "a", "href": "https://www.linkedin.com/safety/go/?url=https%3A%2F%2Facme.com",
+                   "selector": '[data-sidegig-idx="1"]'}
+
+
+def test_choose_apply_cta_none_when_llm_declines():
+    with patch("jobscout.apply.page_state.call_json", return_value={"index": -1}):
+        assert choose_apply_cta(_CtaPage()) is None
+
+
+def test_choose_apply_cta_none_on_llm_failure():
+    with patch("jobscout.apply.page_state.call_json", side_effect=RuntimeError("boom")):
+        assert choose_apply_cta(_CtaPage()) is None
