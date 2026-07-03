@@ -116,3 +116,61 @@ def classify_page(page: Page, *, model: str = _CLASSIFY_MODEL) -> PageAssessment
     except ValueError:
         state = PageState.OTHER
     return PageAssessment(state, str(result.get("reason", ""))[:200])
+
+
+# --- DOM-aware apply-CTA selection ------------------------------------------
+# Which element proceeds with THIS application — decided by the LLM from the
+# actual visible controls, not a keyword list that grabs sign-in/save decoys.
+
+_CTA_SNAPSHOT_JS = """() => {
+  const vis = el => { const r=el.getBoundingClientRect(); const s=getComputedStyle(el);
+    return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
+  return [...document.querySelectorAll('a,button,[role=button]')].filter(vis).slice(0, 60).map((el,i) => {
+    el.setAttribute('data-sidegig-idx', String(i));
+    return {
+      i,
+      tag: el.tagName.toLowerCase(),
+      text: (el.textContent||'').trim().replace(/\\s+/g,' ').slice(0, 80),
+      aria: (el.getAttribute('aria-label')||'').slice(0, 80),
+      href: el.tagName === 'A' ? (el.href||'') : '',
+    };
+  });
+}"""
+
+_CTA_SYSTEM = (
+    "You choose which on-page element STARTS or CONTINUES submitting THIS job "
+    "application. Input: a list of visible clickable elements (index i, tag, "
+    "text, aria, href).\n"
+    'Respond strict JSON: {"index": <i>, "kind": "link"|"button"} — or '
+    '{"index": -1} if none applies.\n'
+    "Pick the primary apply/continue control (e.g. 'Bewerben', 'Auf "
+    "Firmenwebseite bewerben', 'Apply', 'Jetzt bewerben', 'Continue to "
+    "application', 'Weiter').\n"
+    "NEVER pick: sign in / log in / register / SSO (Google/Apple/LinkedIn/"
+    "Microsoft), 'apply later' / save / merken / wishlist, links to OTHER job "
+    "listings or similar jobs, share, report, cookie/consent, or navigation. If "
+    "the only apply-like control is a sign-in prompt, return index -1."
+)
+
+
+def choose_apply_cta(page: Page, *, model: str = _CLASSIFY_MODEL) -> dict[str, Any] | None:
+    """LLM picks the element that proceeds with THIS application (not a sign-in /
+    save / similar-jobs decoy), marks it, and returns {kind, href, selector} or
+    None. DOM-aware replacement for keyword-based CTA scanning."""
+    try:
+        cands = page.evaluate(_CTA_SNAPSHOT_JS)
+    except Exception:
+        return None
+    if not cands:
+        return None
+    try:
+        result = call_json(model=model, system=_CTA_SYSTEM, user=json.dumps(cands, ensure_ascii=False), max_tokens=80)
+    except Exception:
+        return None
+    idx = result.get("index")
+    if not isinstance(idx, int) or idx < 0:
+        return None
+    match = next((c for c in cands if c.get("i") == idx), None)
+    if not match:
+        return None
+    return {"kind": match.get("tag"), "href": match.get("href") or None, "selector": f'[data-sidegig-idx="{idx}"]'}
