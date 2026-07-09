@@ -161,6 +161,8 @@ def render(listing: dict[str, Any]) -> None:
             )
         with col_star:
             bookmarked = bool(listing.get("bookmarked"))
+            if bookmarked:
+                st.markdown('<span class="jobscout-star-on-marker"></span>', unsafe_allow_html=True)
             if st.button(
                 "★" if bookmarked else "☆",
                 key=f"star-{listing.get('id', '')}",

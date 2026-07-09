@@ -167,6 +167,13 @@ _CSS = """
     background: #dc2626 !important;
     border-color: #dc2626 !important;
   }
+
+  /* Bookmarked star — gold. Marker present only when the listing is starred. */
+  .jobscout-star-on-marker { display: none; }
+  div[data-testid="stColumn"]:has(.jobscout-star-on-marker) [data-testid="stButton"] button {
+    color: #f5b301 !important;
+    border: 1px solid #f5b301 !important;
+  }
 </style>
 """
 
