@@ -16,6 +16,7 @@ from jobscout.db import (
     get_latest_draft_for_listing,
     insert_apply_request,
     mark_listing_viewed,
+    set_listing_bookmarked,
     update_listing_status,
 )
 from jobscout.models import ApplyMethod, Arrangement, JobType, ListingStatus
@@ -139,7 +140,7 @@ def render(listing: dict[str, Any]) -> None:
         if seen:
             st.markdown('<span class="jobscout-viewed-marker"></span>', unsafe_allow_html=True)
 
-        col_title, col_score, col_remove = st.columns([5, 1, 1])
+        col_title, col_score, col_star, col_remove = st.columns([5, 1, 1, 1])
         with col_title:
             raw = listing.get("raw") or {}
             favicon = favicon_url(
@@ -158,6 +159,15 @@ def render(listing: dict[str, Any]) -> None:
                 f'<div class="{score_pill_class(score)}">{score_str}</div>',
                 unsafe_allow_html=True,
             )
+        with col_star:
+            bookmarked = bool(listing.get("bookmarked"))
+            if st.button(
+                "★" if bookmarked else "☆",
+                key=f"star-{listing.get('id', '')}",
+                help="Remove from favorites" if bookmarked else "Save to favorites",
+            ) and listing.get("id"):
+                set_listing_bookmarked(listing["id"], not bookmarked)
+                st.rerun()
         with col_remove:
             # Manual fallback for listings the freshness sweep misses or that
             # are inappropriate. EXPIRED is terminal and hidden by the pipeline

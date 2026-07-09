@@ -67,6 +67,8 @@ def render_sidebar_filters() -> None:
         st.session_state["min_score"] = 0
     if "only_unviewed" not in st.session_state:
         st.session_state["only_unviewed"] = False
+    if "only_bookmarked" not in st.session_state:
+        st.session_state["only_bookmarked"] = False
     if "sort_by" not in st.session_state:
         st.session_state["sort_by"] = "first_seen"
     if "page" not in st.session_state:
@@ -112,6 +114,17 @@ def render_sidebar_filters() -> None:
             st.session_state["page"] = 0
             st.rerun()
 
+        new_bookmarked = st.checkbox(
+            "★ Favorites only",
+            value=st.session_state["only_bookmarked"],
+            key="filter-bookmarked",
+            help="Show only listings you've starred.",
+        )
+        if new_bookmarked != st.session_state["only_bookmarked"]:
+            st.session_state["only_bookmarked"] = new_bookmarked
+            st.session_state["page"] = 0
+            st.rerun()
+
         new_sort = st.selectbox(
             "Sort by",
             options=list(_SORTS.keys()),
@@ -134,6 +147,7 @@ def _current_filter_args() -> dict[str, Any]:
         "apply_methods": st.session_state.get("apply_methods") or None,
         "min_score": int(st.session_state.get("min_score") or 0),
         "only_unviewed": bool(st.session_state.get("only_unviewed")),
+        "only_bookmarked": bool(st.session_state.get("only_bookmarked")),
     }
 
 
@@ -176,7 +190,10 @@ def render_listing_list() -> None:
 def render_empty_state() -> None:
     filters = _current_filter_args()
     any_filter_active = (
-        filters["apply_methods"] or filters["min_score"] > 0 or filters["only_unviewed"]
+        filters["apply_methods"]
+        or filters["min_score"] > 0
+        or filters["only_unviewed"]
+        or filters["only_bookmarked"]
     )
     if any_filter_active:
         st.info("No listings match the current filters. Adjust the sidebar to see more.")

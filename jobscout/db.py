@@ -43,6 +43,11 @@ def update_listing_status(
     _client().table("listings").update(patch).eq("id", listing_id).execute()
 
 
+def set_listing_bookmarked(listing_id: str, bookmarked: bool) -> None:
+    """Toggle a listing's favorite/bookmark flag."""
+    _client().table("listings").update({"bookmarked": bookmarked}).eq("id", listing_id).execute()
+
+
 def set_listing_salary_estimate(
     listing_id: str, *, salary_min: float, salary_max: float, note: str, confidence: str = "low"
 ) -> None:
@@ -146,6 +151,7 @@ def _apply_pipeline_filters(
     apply_methods: list[str] | None,
     min_score: int,
     only_unviewed: bool,
+    only_bookmarked: bool = False,
 ) -> Any:
     """Apply the sidebar filter set to a Supabase query builder. Used by
     both list_pipeline_listings and count_pipeline_listings so the count
@@ -157,6 +163,8 @@ def _apply_pipeline_filters(
         q = q.gte("score", min_score)
     if only_unviewed:
         q = q.is_("viewed_at", "null")
+    if only_bookmarked:
+        q = q.eq("bookmarked", True)
     return q
 
 
@@ -165,6 +173,7 @@ def list_pipeline_listings(
     apply_methods: list[str] | None = None,
     min_score: int = 0,
     only_unviewed: bool = False,
+    only_bookmarked: bool = False,
     sort_by: str = "first_seen",
     limit: int = 20,
     offset: int = 0,
@@ -178,6 +187,7 @@ def list_pipeline_listings(
         apply_methods=apply_methods,
         min_score=min_score,
         only_unviewed=only_unviewed,
+        only_bookmarked=only_bookmarked,
     )
     if sort_by == "score":
         q = q.order("score", desc=True, nullsfirst=False)
@@ -192,12 +202,14 @@ def count_pipeline_listings(
     apply_methods: list[str] | None = None,
     min_score: int = 0,
     only_unviewed: bool = False,
+    only_bookmarked: bool = False,
 ) -> int:
     q = _apply_pipeline_filters(
         _client().table("listings").select("id", count="exact"),
         apply_methods=apply_methods,
         min_score=min_score,
         only_unviewed=only_unviewed,
+        only_bookmarked=only_bookmarked,
     )
     return q.execute().count or 0
 
