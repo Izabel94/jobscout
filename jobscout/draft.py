@@ -11,7 +11,7 @@ from jobscout.models import Draft, Listing, ListingStatus
 
 log = logging.getLogger("draft")
 
-_MODEL_DRAFT = "gemini-3.1-flash-lite"  # spec §10 decision
+_MODEL_DRAFT = "gemini-2.5-flash"  # free-tier; 2.5-pro has zero free quota
 _PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
@@ -80,12 +80,14 @@ def draft_one(listing: Listing) -> Draft:
         "{{listing_full}}", f"{listing.title}\n\n{listing.description or ''}"
     )
 
-    body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=2000)
+    # Headroom for thinking-capable models (2.5-flash spends part of the budget on
+    # hidden reasoning; too low truncates the output mid-sentence).
+    body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
     cv_md = call_text(
         model=_MODEL_DRAFT,
         system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
         user=rendered_cv,
-        max_tokens=6000,
+        max_tokens=10000,
     )
 
     violations = _verify_cv_facts(cv_base_md, cv_md)
