@@ -17,6 +17,7 @@ from jobscout.db import (
     insert_apply_request,
     mark_listing_viewed,
     set_listing_bookmarked,
+    update_draft_content,
     update_listing_status,
 )
 from jobscout.models import ApplyMethod, Arrangement, JobType, ListingStatus
@@ -286,10 +287,19 @@ def render(listing: dict[str, Any]) -> None:
                     height=150,
                     label_visibility="collapsed",
                 )
-                if edited != (draft.get("body") or ""):
-                    st.caption("Edited (save on apply — Phase 4)")
                 st.markdown("**Adapted CV (markdown)**")
-                st.code(draft.get("adapted_cv") or "", language="markdown")
+                edited_cv = st.text_area(
+                    "Adapted CV (markdown)",
+                    value=draft.get("adapted_cv") or "",
+                    key=f"cv-{listing['id']}-{draft['id']}",
+                    height=300,
+                    label_visibility="collapsed",
+                )
+                _dirty = edited != (draft.get("body") or "") or edited_cv != (draft.get("adapted_cv") or "")
+                if _dirty and st.button("💾 Save edits", key=f"save-{listing['id']}-{draft['id']}"):
+                    update_draft_content(draft["id"], body=edited, adapted_cv=edited_cv)
+                    st.toast("Edits saved — the worker will apply with these.")
+                    st.rerun()
             else:
                 st.caption("No draft generated yet — run `make draft` after scoring.")
 
