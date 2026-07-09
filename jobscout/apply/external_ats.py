@@ -748,6 +748,24 @@ def _advance_to_next_step(page: Page) -> bool:
             )
 
 
+_ASHBY_ORG_RE = re.compile(r"(?:jobs\.)?ashbyhq\.com/([A-Za-z0-9._-]+)")
+
+
+def _ashby_form_url(page: Page) -> str | None:
+    """Resolve a JS-embedded Ashby board to its canonical form URL from the page's
+    `ashby_jid` — the embed renders no form or CTA in a headless session."""
+    if "ashbyhq.com" in (page.url or ""):
+        return None
+    jid = (parse_qs(urlparse(page.url).query).get("ashby_jid") or [None])[0]
+    if not jid:
+        return None
+    with contextlib.suppress(Exception):
+        match = _ASHBY_ORG_RE.search(page.content())
+        if match:
+            return f"https://jobs.ashbyhq.com/{match.group(1)}/{jid}/application"
+    return None
+
+
 def _walk_to_form(context: BrowserContext, page: Page) -> Page:
     """Follow the apply CTA until the page is an actual application form, up to
     _MAX_APPLY_HOPS. The CTA is chosen by the LLM from the page's real controls
@@ -763,6 +781,22 @@ def _walk_to_form(context: BrowserContext, page: Page) -> Page:
             return page
         cta = choose_apply_cta(page)
         if not cta:
+            # No clickable CTA, but a JS-embedded Ashby form may live at a URL we
+            # can build from the page's ashby_jid.
+            ashby = _ashby_form_url(page)
+            if ashby:
+                print(f"  hop {hop + 1}/{_MAX_APPLY_HOPS}: resolving embedded ATS form -> {ashby[:90]}", flush=True)
+                with contextlib.suppress(Exception):
+                    new_page = context.new_page()
+                    new_page.goto(ashby, wait_until="networkidle", timeout=30_000)
+                    new_page.wait_for_timeout(5_000)  # Ashby SPA renders fields async
+                    if hop > 0:
+                        with contextlib.suppress(Exception):
+                            page.close()
+                    page = new_page
+                    with contextlib.suppress(Exception):
+                        page.bring_to_front()
+                    continue
             return page
         href = cta.get("href")
         if cta.get("kind") == "a" and href and not href.endswith("#"):
