@@ -105,6 +105,12 @@ def write_draft(d: Draft) -> str:
     return str(row["id"])
 
 
+def update_draft_content(draft_id: str, *, body: str, adapted_cv: str) -> None:
+    """Persist user edits to a draft's cover letter + adapted CV so the apply
+    worker (which reads the draft from the DB) applies with the edited text."""
+    _client().table("drafts").update({"body": body, "adapted_cv": adapted_cv}).eq("id", draft_id).execute()
+
+
 def record_submission(listing_id: str, draft_id: str | None, channel: str, notes: str | None = None) -> str:
     res = (
         _client()
