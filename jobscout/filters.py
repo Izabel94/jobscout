@@ -34,6 +34,16 @@ def pass_structural(listing: Listing) -> bool:
     return True
 
 
+def pass_arrangement(listing: Listing) -> bool:
+    """Enforce the Settings → Work arrangement preference. Drops listings whose
+    arrangement isn't among the checked options. UNKNOWN is kept (scraper
+    couldn't classify — don't over-drop); no preferences set keeps everything."""
+    prefs = load_profile().get("arrangement_preferences") or []
+    if not prefs or listing.arrangement in (None, Arrangement.UNKNOWN):
+        return True
+    return listing.arrangement.value in prefs
+
+
 def has_hard_drop_pattern(listing: Listing) -> bool:
     rules = load_spam_rules()
     text = f"{listing.title}\n{listing.description or ''}"
