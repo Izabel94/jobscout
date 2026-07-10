@@ -23,6 +23,14 @@ from jobscout.db import (
 from jobscout.models import ApplyMethod, Arrangement, JobType, ListingStatus
 
 
+@st.cache_data(show_spinner=False)
+def _cv_pdf(cv_md: str) -> bytes:
+    """Cached CV→PDF (fpdf2) so it renders once per unique CV, not every rerun."""
+    from jobscout.cv_render import cv_markdown_to_pdf_bytes
+
+    return cv_markdown_to_pdf_bytes(cv_md)
+
+
 def score_pill_class(score: int | None) -> str:
     if score is None or score < 60:
         return "jobscout-score jobscout-score-low"
@@ -300,15 +308,13 @@ def render(listing: dict[str, Any]) -> None:
                     update_draft_content(draft["id"], body=edited, adapted_cv=edited_cv)
                     st.toast("Edits saved — the worker will apply with these.")
                     st.rerun()
-                # Styled CV as HTML — open it and print to PDF from the browser
-                # (for login-walled listings you apply to by hand).
-                from jobscout.cv_render import cv_markdown_to_html
-
+                # Direct CV PDF (fpdf2, pure Python — renders on Cloud) for
+                # login-walled listings you apply to by hand.
                 st.download_button(
-                    "⬇ CV (open & print to PDF)",
-                    cv_markdown_to_html(edited_cv),
-                    file_name=f"cv-{listing['id'][:8]}.html",
-                    mime="text/html",
+                    "⬇ CV (PDF)",
+                    _cv_pdf(edited_cv),
+                    file_name=f"cv-{listing['id'][:8]}.pdf",
+                    mime="application/pdf",
                     key=f"dl-cv-{listing['id']}",
                 )
             else:
