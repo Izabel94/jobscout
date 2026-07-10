@@ -300,6 +300,17 @@ def render(listing: dict[str, Any]) -> None:
                     update_draft_content(draft["id"], body=edited, adapted_cv=edited_cv)
                     st.toast("Edits saved — the worker will apply with these.")
                     st.rerun()
+                # Styled CV as HTML — open it and print to PDF from the browser
+                # (for login-walled listings you apply to by hand).
+                from jobscout.cv_render import cv_markdown_to_html
+
+                st.download_button(
+                    "⬇ CV (open & print to PDF)",
+                    cv_markdown_to_html(edited_cv),
+                    file_name=f"cv-{listing['id'][:8]}.html",
+                    mime="text/html",
+                    key=f"dl-cv-{listing['id']}",
+                )
             else:
                 st.caption("No draft generated yet — run `make draft` after scoring.")
 

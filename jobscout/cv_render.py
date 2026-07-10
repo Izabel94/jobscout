@@ -57,16 +57,40 @@ def _photo_data_uri() -> str | None:
     return f"data:{mime};base64,{data}"
 
 
-def cv_markdown_to_pdf(cv_md: str, out_path: Path, *, page: Page) -> Path:
-    rendered_html = md.markdown(cv_md, extensions=["tables", "fenced_code"])
+def _normalize_bullets(cv_md: str) -> str:
+    """Profiles bootstrapped from LinkedIn use literal `• ` bullets with no blank
+    line before them — markdown then folds them into the preceding role line
+    instead of a list. Convert to `- ` and open the list with a blank line."""
+    out: list[str] = []
+    in_list = False
+    for line in cv_md.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("• "):
+            if not in_list and out and out[-1].strip():
+                out.append("")
+            out.append("- " + stripped[2:])
+            in_list = True
+        else:
+            out.append(line)
+            in_list = False
+    return "\n".join(out)
+
+
+def cv_markdown_to_html(cv_md: str) -> str:
+    """Self-contained styled CV HTML (inline CSS + embedded photo). Pure Python —
+    no Chrome/WeasyPrint — so it works on Cloud; the user prints it to PDF."""
+    rendered_html = md.markdown(_normalize_bullets(cv_md), extensions=["tables", "fenced_code"])
     rendered_html = _format_role_headers(rendered_html)
     header_html, body_html = _split_header(rendered_html)
-    html = Template(_TEMPLATE_PATH.read_text(encoding="utf-8")).render(
+    return Template(_TEMPLATE_PATH.read_text(encoding="utf-8")).render(
         header_html=header_html,
         body_html=body_html,
         photo_data_uri=_photo_data_uri(),
     )
-    page.set_content(html, wait_until="networkidle")
+
+
+def cv_markdown_to_pdf(cv_md: str, out_path: Path, *, page: Page) -> Path:
+    page.set_content(cv_markdown_to_html(cv_md), wait_until="networkidle")
     page.pdf(path=str(out_path), format="A4", print_background=True)
     return out_path
 
