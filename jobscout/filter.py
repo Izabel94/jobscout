@@ -8,6 +8,7 @@ from jobscout.filters import (
     duplicate_ids,
     has_hard_drop_pattern,
     media_agency_ids,
+    pass_arrangement,
     pass_embedding,
     pass_skill_match,
     pass_structural,
@@ -56,6 +57,9 @@ def main() -> None:
             update_listing_status(listing_id, ListingStatus.REJECTED)
             continue
         if not pass_title_denylist(listing):
+            update_listing_status(listing_id, ListingStatus.REJECTED)
+            continue
+        if not pass_arrangement(listing):
             update_listing_status(listing_id, ListingStatus.REJECTED)
             continue
         if not pass_embedding(listing):

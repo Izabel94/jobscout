@@ -12,6 +12,10 @@ from jobscout.models import Draft, Listing, ListingStatus
 log = logging.getLogger("draft")
 
 _MODEL_DRAFT = "gemini-2.5-flash"  # free-tier; 2.5-pro has zero free quota
+# CV adaptation is a literal fact-preserving edit — use the deterministic
+# non-thinking model. 2.5-flash's variance intermittently dropped trailing
+# entries/years, failing _verify_cv_facts.
+_MODEL_CV = "gemini-3.1-flash-lite"
 _PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
@@ -84,7 +88,7 @@ def draft_one(listing: Listing) -> Draft:
     # hidden reasoning; too low truncates the output mid-sentence).
     body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
     cv_md = call_text(
-        model=_MODEL_DRAFT,
+        model=_MODEL_CV,
         system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
         user=rendered_cv,
         max_tokens=10000,
