@@ -89,6 +89,93 @@ def cv_markdown_to_html(cv_md: str) -> str:
     )
 
 
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_PUNCT = {
+    "–": "-", "—": "-", "−": "-", "•": "-", "…": "...", "€": "EUR",
+    "’": "'", "‘": "'", "‚": "'", "‛": "'",
+    "“": '"', "”": '"', "„": '"', "‟": '"', "«": '"', "»": '"',
+}
+
+
+def _plain(text: str) -> str:
+    """Strip markdown emphasis/links + map typographic punctuation to ASCII, then
+    drop any residual non-latin-1 char (core PDF fonts are latin-1)."""
+    text = _MD_LINK_RE.sub(r"\1", text).replace("**", "").replace("`", "")
+    text = re.sub(r"<(https?://[^>]+)>", r"\1", text)
+    text = re.sub(r"(?<!\*)\*(?!\*)", "", text)
+    for uni, asc in _PUNCT.items():
+        text = text.replace(uni, asc)
+    return text.encode("latin-1", "ignore").decode("latin-1").strip()
+
+
+def cv_markdown_to_pdf_bytes(cv_md: str) -> bytes:
+    """Direct CV → PDF via fpdf2 — pure Python, no system libs, so it runs on
+    Streamlit Cloud. Lays out the CV markdown structure (# name, contact line,
+    ## section, ### company | location, **role** | *dates*, bullets)."""
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+
+    pdf = FPDF(format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(15, 12, 15)
+    pdf.add_page()
+    w = pdf.epw
+    c1, c2 = w * 0.68, w * 0.32
+    photo = _PHOTO_PATH if _PHOTO_PATH.exists() else None
+    head_w = w - 26 if photo else w
+    expect_contact = False
+
+    for raw in cv_md.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("# "):
+            if photo:
+                pdf.image(str(photo), x=pdf.w - 15 - 22, y=11, w=22)
+            pdf.set_font("Helvetica", "B", 17)
+            pdf.multi_cell(head_w, 9, _plain(line[2:]), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            expect_contact = True
+        elif expect_contact and not line.startswith(("#", "-", "*", "•")):
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(90, 90, 90)
+            pdf.multi_cell(head_w, 5, _plain(line), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            expect_contact = False
+        elif line.startswith("## "):
+            pdf.ln(2.5)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.multi_cell(w, 6, _plain(line[3:]).upper(), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.line(15, pdf.get_y(), 15 + w, pdf.get_y())
+            pdf.ln(1.5)
+        elif line.startswith("### "):
+            company, _, loc = line[4:].partition("|")
+            pdf.ln(1.5)
+            pdf.set_font("Helvetica", "B", 10.5)
+            if loc.strip():
+                pdf.cell(c1, 5.5, _plain(company))
+                pdf.set_font("Helvetica", "", 9)
+                pdf.cell(c2, 5.5, _plain(loc), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            else:
+                pdf.multi_cell(w, 5.5, _plain(company), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        elif line.startswith("**") and "|" in line:
+            role, dates = line.split("|", 1)
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.cell(c1, 5, _plain(role))
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(c2, 5, _plain(dates), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        elif line[:2] in ("- ", "* ", "• "):
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_x(18)
+            pdf.multi_cell(w - 3, 4.6, "-  " + _plain(line[2:]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        elif line.startswith("**") and line.endswith("**"):
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.multi_cell(w, 5.5, _plain(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        else:
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.multi_cell(w, 4.8, _plain(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    return bytes(pdf.output())
+
+
 def cv_markdown_to_pdf(cv_md: str, out_path: Path, *, page: Page) -> Path:
     page.set_content(cv_markdown_to_html(cv_md), wait_until="networkidle")
     page.pdf(path=str(out_path), format="A4", print_background=True)
