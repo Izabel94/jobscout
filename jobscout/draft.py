@@ -6,7 +6,7 @@ from pathlib import Path
 
 from jobscout.config_loader import load_cv_markdown, load_profile, render_candidate_block
 from jobscout.db import list_by_status, update_listing_status, write_draft
-from jobscout.llm import call_text
+from jobscout.llm import LLMProviderError, call_text
 from jobscout.models import Draft, Listing, ListingStatus
 
 log = logging.getLogger("draft")
@@ -84,9 +84,13 @@ def draft_one(listing: Listing) -> Draft:
         "{{listing_full}}", f"{listing.title}\n\n{listing.description or ''}"
     )
 
-    # Headroom for thinking-capable models (2.5-flash spends part of the budget on
-    # hidden reasoning; too low truncates the output mid-sentence).
-    body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
+    # Cover letter: 2.5-flash for quality, but its free tier is ~20 req/day — on
+    # quota exhaustion fall back to flash-lite so drafting never hard-fails.
+    # Headroom leaves room for the thinking model's hidden reasoning.
+    try:
+        body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
+    except LLMProviderError:
+        body = call_text(model=_MODEL_CV, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
     cv_md = call_text(
         model=_MODEL_CV,
         system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
