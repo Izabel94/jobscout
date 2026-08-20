@@ -170,25 +170,30 @@ def render(listing: dict[str, Any]) -> None:
             )
         with col_star:
             bookmarked = bool(listing.get("bookmarked"))
-            if bookmarked:
-                st.markdown('<span class="jobscout-star-on-marker"></span>', unsafe_allow_html=True)
-            if st.button(
+            clicked_star = st.button(
                 "★" if bookmarked else "☆",
                 key=f"star-{listing.get('id', '')}",
                 help="Remove from favorites" if bookmarked else "Save to favorites",
-            ) and listing.get("id"):
+            )
+            # Marker rendered AFTER the button so the button is the column's
+            # first child and top-aligns with the score pill and Remove button.
+            # display:none, so it only feeds the parent's :has() styling.
+            if bookmarked:
+                st.markdown('<span class="jobscout-star-on-marker"></span>', unsafe_allow_html=True)
+            if clicked_star and listing.get("id"):
                 set_listing_bookmarked(listing["id"], not bookmarked)
                 st.rerun()
         with col_remove:
             # Manual fallback for listings the freshness sweep misses or that
             # are inappropriate. EXPIRED is terminal and hidden by the pipeline
             # query; the worker drops any queued apply for it.
-            st.markdown('<span class="jobscout-remove-marker"></span>', unsafe_allow_html=True)
-            if st.button(
+            clicked_remove = st.button(
                 "✕ Remove",
                 key=f"remove-{listing.get('id', '')}",
                 help="Hide this listing (expired or not relevant).",
-            ) and listing.get("id"):
+            )
+            st.markdown('<span class="jobscout-remove-marker"></span>', unsafe_allow_html=True)
+            if clicked_remove and listing.get("id"):
                 update_listing_status(listing["id"], ListingStatus.EXPIRED)
                 st.toast("Listing removed")
                 st.rerun()
@@ -203,7 +208,23 @@ def render(listing: dict[str, Any]) -> None:
             except Exception:
                 posted_at = None
         relative = short_relative_time(posted_at)
-        meta_bits = [b for b in (company, location, f"posted {relative}" if relative else "") if b]
+        found_at = listing.get("first_discovered_at") or listing.get("discovered_at")
+        if isinstance(found_at, str):
+            try:
+                found_at = datetime.fromisoformat(found_at.replace("Z", "+00:00"))
+            except Exception:
+                found_at = None
+        found_relative = short_relative_time(found_at)
+        meta_bits = [
+            b
+            for b in (
+                company,
+                location,
+                f"posted {relative}" if relative else "",
+                f"found {found_relative}" if found_relative else "",
+            )
+            if b
+        ]
         if meta_bits:
             st.markdown(
                 f'<div class="jobscout-meta">{" · ".join(_escape(b) for b in meta_bits)}</div>',
