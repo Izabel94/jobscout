@@ -233,16 +233,6 @@ def count_listings_new_today() -> int:
     return r.count or 0
 
 
-def count_listings_in_dashboard() -> int:
-    r = (
-        _client().table("listings")
-        .select("id", count="exact")
-        .in_("status", ("scored", "drafted"))
-        .execute()
-    )
-    return r.count or 0
-
-
 def count_submissions_last_7d() -> int:
     from datetime import datetime, timedelta, timezone
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()

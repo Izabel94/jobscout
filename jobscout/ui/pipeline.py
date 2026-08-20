@@ -10,7 +10,6 @@ from typing import Any
 import streamlit as st
 
 from jobscout.db import (
-    count_listings_in_dashboard,
     count_listings_new_today,
     count_pipeline_listings,
     count_submissions_last_7d,
@@ -35,7 +34,7 @@ def _kpi_tile(label: str, value_html: str) -> None:
 def render_kpi_hero() -> None:
     new_today = count_listings_new_today()
     applied_today = count_submissions_today_external()
-    in_dashboard = count_listings_in_dashboard()
+    in_dashboard = count_pipeline_listings(**_current_filter_args())
     submitted_7d = count_submissions_last_7d()
     remaining = max(0, APPLY_DAILY_CAP - applied_today)
 
