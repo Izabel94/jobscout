@@ -64,7 +64,7 @@ def render_sidebar_filters() -> None:
     if "apply_methods" not in st.session_state:
         st.session_state["apply_methods"] = []
     if "min_score" not in st.session_state:
-        st.session_state["min_score"] = 0
+        st.session_state["min_score"] = 60
     if "only_unviewed" not in st.session_state:
         st.session_state["only_unviewed"] = False
     if "only_bookmarked" not in st.session_state:
