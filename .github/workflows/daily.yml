@@ -20,6 +20,11 @@ jobs:
       matrix:
         source: [linkedin, indeed]
     steps:
+      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
+      # runner that exhausts the disk mid-job (zstd write errors, then the
+      # worker crashes on teardown). Reclaim the unused toolcaches first.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
@@ -49,6 +54,11 @@ jobs:
     needs: discover
     runs-on: ubuntu-latest
     steps:
+      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
+      # runner that exhausts the disk mid-job (zstd write errors, then the
+      # worker crashes on teardown). Reclaim the unused toolcaches first.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
@@ -69,6 +79,11 @@ jobs:
     needs: freshness
     runs-on: ubuntu-latest
     steps:
+      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
+      # runner that exhausts the disk mid-job (zstd write errors, then the
+      # worker crashes on teardown). Reclaim the unused toolcaches first.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
@@ -102,6 +117,11 @@ jobs:
     needs: filter
     runs-on: ubuntu-latest
     steps:
+      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
+      # runner that exhausts the disk mid-job (zstd write errors, then the
+      # worker crashes on teardown). Reclaim the unused toolcaches first.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false

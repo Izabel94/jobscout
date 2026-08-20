@@ -54,6 +54,37 @@ media_agencies:
   - dieseo
   - Remazing
   - Front Row
+  # Holding-group media/creative agencies (matched word-boundary on company
+  # name). Seeded from the real corpus — Julian wants in-house, not agency.
+  - Omnicom Media
+  - OMD
+  - PHD Germany
+  - Hearts & Science
+  - WPP Media
+  - GroupM
+  - Mindshare
+  - Wavemaker
+  - EssenceMediacom
+  - Mediaplus
+  - Serviceplan
+  - dentsu
+  - Carat
+  - iProspect
+  - Merkle
+  - KINESSO
+  - IPG Mediabrands
+  - Digitas
+  - Havas
+  - MEDIAdock
+  - JOM Group
+  - Weischer
+  - Artefact
+  - Pulse Advertising
+  - Channel Factory
+  - Reprise
+  - sunzinet
+  - Achtung!
+  - Pilot
 
 # Generic agency tells in a company NAME catch agencies not yet listed above.
 media_agency_company_keywords:

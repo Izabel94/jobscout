@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from jobscout.filters import duplicate_ids, is_media_agency, media_agency_ids
 from jobscout.models import Listing, Source
 
@@ -63,3 +65,40 @@ def test_media_agency_ids_filters_list():
     agency = _listing(lid="a", title="T", company="Zenith Deutschland")
     inhouse = _listing(lid="b", title="T", company="Tchibo GmbH")
     assert media_agency_ids([agency, inhouse]) == ["a"]
+
+
+@pytest.mark.parametrize(
+    "company",
+    [
+        "OMD Germany",
+        "Omnicom Media Group",
+        "WPP Media",
+        "GroupM Germany",
+        "KINESSO",
+        "IPG Mediabrands",
+        "dentsu",
+        "Digitas Germany",
+        "Mediaplus Group",
+        "Serviceplan",
+        "PHD Germany",
+        "Pulse Advertising",
+        "Achtung!",  # name ends in punctuation
+        "Achtung! Alive",
+    ],
+)
+def test_holding_company_media_agencies_are_dropped(company: str) -> None:
+    assert is_media_agency(_listing(lid="1", title="T", company=company))
+
+
+@pytest.mark.parametrize(
+    "company",
+    [
+        "Bauer Media Group",
+        "Hubert Burda Media",
+        "FUNKE Mediengruppe",
+        "Ströer SE & Co. KGaA",
+        "ZEIT Verlagsgruppe",
+    ],
+)
+def test_publishers_and_media_owners_are_kept(company: str) -> None:
+    assert not is_media_agency(_listing(lid="1", title="T", company=company))
