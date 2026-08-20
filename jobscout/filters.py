@@ -34,6 +34,21 @@ def pass_structural(listing: Listing) -> bool:
     return True
 
 
+_JUNIOR_TITLE_RE = re.compile(
+    r"\b(junior|jr|werkstudent|working student|intern|internship|praktikum|"
+    r"praktikant(?:in)?|trainee|entry[- ]level|studentische[rs]?|azubi|"
+    r"ausbildung|duales studium)\b",
+    re.I,
+)
+
+
+def pass_seniority(listing: Listing) -> bool:
+    """Drop entry-level roles. The candidate is mid/senior, so junior,
+    working-student, internship, trainee and apprenticeship titles are removed.
+    Word-boundary matched so 'International'/'Internal' don't trip 'intern'."""
+    return _JUNIOR_TITLE_RE.search(listing.title) is None
+
+
 def pass_arrangement(listing: Listing) -> bool:
     """Enforce the Settings → Work arrangement preference. Drops listings whose
     arrangement isn't among the checked options. UNKNOWN is kept (scraper
@@ -129,8 +144,12 @@ def is_media_agency(listing: Listing) -> bool:
     company = _norm(_company(listing))
     if not company:
         return False
-    if any(_norm(a) in company for a in rules.get("media_agencies", [])):
-        return True
+    for agency in rules.get("media_agencies", []):
+        # (?<!\w)...(?!\w) instead of \b so names ending in punctuation
+        # ('Achtung!') still match, while a short token ('OMD') isn't matched
+        # inside a larger word ('comdirect').
+        if re.search(rf"(?<!\w){re.escape(_norm(agency))}(?!\w)", company):
+            return True
     return any(kw.lower() in company for kw in rules.get("media_agency_company_keywords", []))
 
 
@@ -159,10 +178,31 @@ def duplicate_ids(listings: list[Listing]) -> list[str]:
     return reject
 
 
+_GENERIC_ROLE_WORDS = frozenset(
+    {"manager", "consultant", "senior", "junior", "lead", "head", "director", "expert", "specialist"}
+)
+
+
+def _skill_tokens(keywords: list[str]) -> set[str]:
+    """Meaningful tokens from the skill keywords, dropping generic role words.
+
+    The keywords double as discovery search phrases ('Performance Marketing
+    Manager'), so matching them verbatim rejects on-target roles phrased
+    differently. Matching on their domain tokens ('performance', 'marketing')
+    keeps varied titles while still gating off-topic roles."""
+    tokens: set[str] = set()
+    for kw in keywords:
+        for word in re.findall(r"[a-z0-9äöüß]+", kw.lower()):
+            if len(word) >= 3 and word not in _GENERIC_ROLE_WORDS:
+                tokens.add(word)
+    return tokens
+
+
 def pass_skill_match(listing: Listing) -> bool:
     profile = load_profile()
     text = f"{listing.title}\n{listing.description or ''}".lower()
-    return any(kw.lower() in text for kw in profile["required_skill_keywords"])
+    tokens = _skill_tokens(profile["required_skill_keywords"])
+    return any(re.search(rf"\b{re.escape(token)}\b", text) for token in tokens)
 
 
 def pass_title_denylist(listing: Listing) -> bool:
