@@ -1,8 +1,9 @@
 name: daily
 
-# Daily cron over the sources jobscout supports:
-#   - linkedin   (JobSpy; works logged-out, optional cookie via secret)
-#   - indeed     (JobSpy; works logged-out)
+# Daily pipeline over the sources jobscout supports (linkedin, indeed via
+# JobSpy). One job runs the whole pipeline sequentially so poetry installs
+# once instead of per-stage — the repeated torch+CUDA install was the bulk of
+# the Actions minutes.
 
 on:
   schedule:
@@ -13,75 +14,21 @@ permissions:
   contents: read
 
 jobs:
-  discover:
+  pipeline:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        source: [linkedin, indeed]
+    env:
+      LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
+      JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
-      # runner that exhausts the disk mid-job (zstd write errors, then the
-      # worker crashes on teardown). Reclaim the unused toolcaches first.
-      - name: Free disk space
-        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          persist-credentials: false
-      - run: pipx install poetry
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-        with:
-          python-version: "3.13"
-          cache: poetry
-      - run: poetry install --no-interaction
-
-      - name: Run discover for ${{ matrix.source }}
-        env:
-          SOURCE: ${{ matrix.source }}
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
-          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
-        run: poetry run python -m jobscout.discover --only "$SOURCE"
-
-  freshness:
-    # Sweep listings whose detail page now says "no longer accepting" /
-    # "Projekt nicht mehr aktuell" etc. Flips them to EXPIRED so they
-    # don't clog the pipeline. Cheap (HEAD/GET per pipeline listing).
-    needs: discover
-    runs-on: ubuntu-latest
-    steps:
-      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
-      # runner that exhausts the disk mid-job (zstd write errors, then the
-      # worker crashes on teardown). Reclaim the unused toolcaches first.
-      - name: Free disk space
-        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          persist-credentials: false
-      - run: pipx install poetry
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-        with:
-          python-version: "3.13"
-          cache: poetry
-      - run: poetry install --no-interaction
-      - name: Run freshness sweep
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SCRAPER_CONTACT_EMAIL: ${{ secrets.SCRAPER_CONTACT_EMAIL }}
-        run: poetry run python -m jobscout.freshness
-
-  filter:
-    needs: freshness
-    runs-on: ubuntu-latest
-    steps:
-      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
-      # runner that exhausts the disk mid-job (zstd write errors, then the
-      # worker crashes on teardown). Reclaim the unused toolcaches first.
+      # runner that exhausts the disk; reclaim the unused toolcaches first.
       - name: Free disk space
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -104,73 +51,34 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: hf-all-MiniLM-L6-v2-v1
-      - name: Run filter
+
+      - name: Discover (linkedin + indeed)
+        run: poetry run python -m jobscout.discover
+
+      - name: Freshness sweep
+        run: poetry run python -m jobscout.freshness
+
+      - name: Filter
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_HUB_OFFLINE: ${{ steps.hfcache.outputs.cache-hit == 'true' && '1' || '0' }}
         run: poetry run python -m jobscout.filter
 
-  score:
-    needs: filter
-    runs-on: ubuntu-latest
-    steps:
-      # poetry install pulls torch + CUDA wheels (multi-GB). On the stock
-      # runner that exhausts the disk mid-job (zstd write errors, then the
-      # worker crashes on teardown). Reclaim the unused toolcaches first.
-      - name: Free disk space
-        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          persist-credentials: false
-      - run: pipx install poetry
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-        with:
-          python-version: "3.13"
-          cache: poetry
-      - run: poetry install --no-interaction
-      - name: Run salary
-        env:
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
+      - name: Salary
         run: poetry run python -m jobscout.salary
-      - name: Run score
-        env:
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
+
+      - name: Score
         run: poetry run python -m jobscout.score
 
-      - name: Run draft
-        env:
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          JOBSCOUT_PROFILE_LINKEDIN_URL: ${{ secrets.JOBSCOUT_PROFILE_LINKEDIN_URL }}
+      - name: Draft
         run: poetry run python -m jobscout.draft
 
-      # Print a digest of new high-scoring listings to the GHA log. No
-      # email — user opted out. The digest script is still useful locally
-      # (e.g. `make digest` would read from cloud Supabase).
+      # Digest of new high-scoring listings to the GHA log (no email — user
+      # opted out). Runs even if an earlier stage failed.
       - name: Print digest to GHA log
         if: always()
         env:
           PYTHONPATH: .
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NOTIFY_SCORE_FLOOR: "70"
           NOTIFY_HOURS_BACK: "26"
-          UPSTREAM_FAILED: ${{ contains(needs.*.result, 'failure') }}
+          UPSTREAM_FAILED: ${{ job.status == 'failure' }}
         run: poetry run python scripts/build_email_digest.py
