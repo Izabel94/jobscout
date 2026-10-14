@@ -24,12 +24,12 @@ log = logging.getLogger("salary")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 _MODEL = "gemini-3.1-flash-lite"
+_MODEL_FALLBACK = "gemini-2.5-flash"  # route around flash-lite 503 'high demand' spikes
 _ACTIVE_STATUSES = [ListingStatus.NEW, ListingStatus.SCORED, ListingStatus.DRAFTED]
 _CITY = "Hamburg"  # Julian's search is Hamburg-only
 
 _EXTRACT_SYSTEM = (
-    "You extract salary data from German web-search snippets (kununu.com). "
-    "Return STRICT JSON only, no prose."
+    "You extract salary data from German web-search snippets (kununu.com). " "Return STRICT JSON only, no prose."
 )
 _EXTRACT_USER = (
     "Role: {title}\nCompany: {company}\nCity: {city}, Germany\n\n"
@@ -82,7 +82,7 @@ def _lookup(title: str, company: str) -> tuple[Decimal, Decimal, str, str] | Non
     snippets = "\n\n".join(f"{r.get('title', '')}\n{r.get('content', '')}" for r in results)[:4000]
     user = _EXTRACT_USER.format(title=title, company=company or "(unknown)", city=_CITY, snippets=snippets)
     try:
-        data = call_json(model=_MODEL, system=_EXTRACT_SYSTEM, user=user)
+        data = call_json(model=_MODEL, system=_EXTRACT_SYSTEM, user=user, fallback_model=_MODEL_FALLBACK)
     except LLMJSONError:
         return None
     return coerce_estimate(data)
