@@ -15,11 +15,11 @@ python-dotenv>=1.0,<2
 PyYAML>=6.0,<7
 httpx>=0.27,<1
 beautifulsoup4>=4.12,<5
-typing-extensions>=4.0,<5
+typing-extensions>=4.16.0,<5
 # CV export: fpdf2 renders the CV markdown straight to PDF (pure Python, no
 # system libs). markdown + jinja2 (ships with streamlit) back the worker's
 # Chrome-printed HTML path.
-fpdf2>=2.8,<3
+fpdf2>=2.8.8,<3
 markdown>=3.10,<4
 # Intentionally NO lxml — Streamlit Cloud lacks libxml2-dev system packages
 # so lxml fails to build from sdist. BS4 falls back to stdlib `html.parser`.
