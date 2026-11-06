@@ -23,41 +23,39 @@ def _load() -> dict:
     return st.session_state["pending_profile"]
 
 
-def render_search_terms_card() -> None:
+def _chip_editor(field: str, kind: str, placeholder: str, cap: int | None = None) -> None:
+    """Chips (click to remove) + an input with Add, for a list field of the profile.
+
+    `kind` names the widget keys (rm-<kind>-i, new-<kind>, add-<kind>); styles.py colours
+    the chips by that key."""
     p = _load()
-    terms = list(p.get("required_skill_keywords") or [])
+    items = list(p.get(field) or [])
+    if items:
+        with st.container(horizontal=True, gap="small"):
+            for i, item in enumerate(items):
+                if st.button(f"× {item}", key=f"rm-{kind}-{i}"):
+                    items.pop(i)
+                    p[field] = items
+                    st.rerun()
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom", key=f"add-row-{kind}"):
+        new = st.text_input(f"Add {kind}", key=f"new-{kind}", placeholder=placeholder, label_visibility="collapsed")
+        if st.button("Add", key=f"add-{kind}"):
+            t = (new or "").strip()
+            if t and t not in items:
+                if cap is not None and len(items) >= cap:
+                    st.warning(f"Cap is {cap}. Remove one first.")
+                else:
+                    items.append(t)
+                    p[field] = items
+                    st.rerun()
+
+
+def render_search_terms_card() -> None:
+    terms = _load().get("required_skill_keywords") or []
     with st.container(border=True):
         st.markdown(f"**Search terms**  ·  {len(terms)} / {_MAX_SEARCH_TERMS} used")
         st.caption("The role titles jobscout searches for on LinkedIn and Indeed. Up to 5.")
-        if terms:
-            cols = st.columns(len(terms))
-            for i, term in enumerate(terms):
-                with cols[i]:
-                    st.markdown(
-                        '<span class="jobscout-chip-marker-search"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(f"× {term}", key=f"rm-term-{i}"):
-                        terms.pop(i)
-                        p["required_skill_keywords"] = terms
-                        st.rerun()
-        new_term = st.text_input(
-            "Add search term",
-            key="new-term",
-            placeholder="e.g. 'Growth Manager'",
-            label_visibility="collapsed",
-        )
-        col_l, col_r = st.columns([5, 1])
-        with col_r:
-            if st.button("Add", key="add-term", use_container_width=True):
-                t = (new_term or "").strip()
-                if t and t not in terms:
-                    if len(terms) >= _MAX_SEARCH_TERMS:
-                        st.warning(f"Cap is {_MAX_SEARCH_TERMS}. Remove one first.")
-                    else:
-                        terms.append(t)
-                        p["required_skill_keywords"] = terms
-                        st.rerun()
+        _chip_editor("required_skill_keywords", "term", "e.g. 'Growth Manager'", cap=_MAX_SEARCH_TERMS)
 
 
 def render_arrangement_card() -> None:
@@ -66,57 +64,20 @@ def render_arrangement_card() -> None:
     with st.container(border=True):
         st.markdown("**Work arrangement**")
         st.caption("Listings outside these preferences get filtered out.")
-        col_r, col_h, col_o = st.columns(3)
-        with col_r:
-            if st.checkbox("remote", value="remote" in prefs, key="arr-remote"):
-                prefs.add("remote")
-            else:
-                prefs.discard("remote")
-        with col_h:
-            if st.checkbox("hybrid", value="hybrid" in prefs, key="arr-hybrid"):
-                prefs.add("hybrid")
-            else:
-                prefs.discard("hybrid")
-        with col_o:
-            if st.checkbox("on-site", value="onsite" in prefs, key="arr-onsite"):
-                prefs.add("onsite")
-            else:
-                prefs.discard("onsite")
+        with st.container(horizontal=True, gap="medium", vertical_alignment="center"):
+            for value, label in (("remote", "remote"), ("hybrid", "hybrid"), ("onsite", "on-site")):
+                if st.checkbox(label, value=value in prefs, key=f"arr-{value}"):
+                    prefs.add(value)
+                else:
+                    prefs.discard(value)
         p["arrangement_preferences"] = sorted(prefs)
 
 
 def render_title_denylist_card() -> None:
-    p = _load()
-    denies = list(p.get("title_denylist") or [])
     with st.container(border=True):
         st.markdown("**Title denylist**")
         st.caption("Job titles containing any of these words get dropped. Useful for agency-flavored roles.")
-        if denies:
-            cols = st.columns(len(denies))
-            for i, d in enumerate(denies):
-                with cols[i]:
-                    st.markdown(
-                        '<span class="jobscout-chip-marker-deny"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(f"× {d}", key=f"rm-deny-{i}"):
-                        denies.pop(i)
-                        p["title_denylist"] = denies
-                        st.rerun()
-        new_deny = st.text_input(
-            "Add word",
-            key="new-deny",
-            placeholder="e.g. 'SAP'",
-            label_visibility="collapsed",
-        )
-        col_l, col_r = st.columns([5, 1])
-        with col_r:
-            if st.button("Add", key="add-deny", use_container_width=True):
-                t = (new_deny or "").strip()
-                if t and t not in denies:
-                    denies.append(t)
-                    p["title_denylist"] = denies
-                    st.rerun()
+        _chip_editor("title_denylist", "deny", "e.g. 'SAP'")
 
 
 def render_scorer_notes_card() -> None:
@@ -160,25 +121,42 @@ def cv_photo_b64(data: bytes) -> str:
     return base64.b64encode(out.getvalue()).decode("ascii")
 
 
+def _uploader_key() -> str:
+    # A new key gives a fresh, empty uploader, so after "Remove photo" picking the same file
+    # again is a change (the browser fires no change event for a re-picked identical file).
+    return f"photo-upload-{st.session_state.get('photo-upload-generation', 0)}"
+
+
+def _apply_photo_upload() -> None:
+    upload = st.session_state.get(_uploader_key())
+    if upload is not None:
+        _load()["photo_jpeg_b64"] = cv_photo_b64(upload.getvalue())
+
+
 def render_photo_card() -> None:
     p = _load()
     with st.container(border=True):
         st.markdown("**CV photo**")
         st.caption("Shown top right on every CV PDF — uploads and downloads alike.")
-        col_img, col_ctl = st.columns([1, 3])
-        with col_ctl:
-            upload = st.file_uploader("Upload photo", type=["jpg", "jpeg", "png"], key="photo-upload")
-            # Apply each upload once, so "Remove" isn't undone by the file still sitting in the uploader.
-            if upload is not None and st.session_state.get("photo-upload-applied") != upload.file_id:
-                p["photo_jpeg_b64"] = cv_photo_b64(upload.getvalue())
-                st.session_state["photo-upload-applied"] = upload.file_id
-            if p.get("photo_jpeg_b64") and st.button("Remove photo", key="photo-remove"):
-                p["photo_jpeg_b64"] = None
-        with col_img:
+        with st.container(horizontal=True, gap="medium", vertical_alignment="top"):
             if p.get("photo_jpeg_b64"):
-                st.image(base64.b64decode(p["photo_jpeg_b64"]), width=110)
+                st.markdown(
+                    f'<img class="jobscout-photo" alt="CV photo" src="data:image/jpeg;base64,{p["photo_jpeg_b64"]}">',
+                    unsafe_allow_html=True,
+                    width="content",
+                )
             else:
                 st.caption("No photo yet")
+            with st.container():
+                # on_change runs once per new file and before the preview above is drawn,
+                # so the preview is current and "Remove" isn't undone by the file left in the uploader.
+                st.file_uploader(
+                    "Upload photo", type=["jpg", "jpeg", "png"], key=_uploader_key(), on_change=_apply_photo_upload
+                )
+                if p.get("photo_jpeg_b64") and st.button("Remove photo", key="photo-remove"):
+                    p["photo_jpeg_b64"] = None
+                    st.session_state["photo-upload-generation"] = st.session_state.get("photo-upload-generation", 0) + 1
+                    st.rerun()
 
 
 def render_profile_snapshot() -> None:
@@ -209,28 +187,28 @@ def render_save_bar() -> None:
     if "pending_profile" not in st.session_state:
         return
     pending = st.session_state["pending_profile"]
-    col_l, col_r = st.columns([6, 2])
-    with col_r:
-        sub_l, sub_r = st.columns(2)
-        with sub_l:
-            if st.button("Discard", key="discard", use_container_width=True):
-                st.session_state.pop("pending_profile", None)
-                st.rerun()
-        with sub_r:
-            if st.button("Save changes", key="save", type="primary", use_container_width=True):
-                save_profile_changes(pending)
-                st.session_state.pop("pending_profile", None)
-                st.toast("Saved.", icon="✅")
-                st.rerun()
+    with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+        if st.button("Discard", key="discard"):
+            st.session_state.pop("pending_profile", None)
+            st.rerun()
+        if st.button("Save changes", key="save", type="primary"):
+            save_profile_changes(pending)
+            st.session_state.pop("pending_profile", None)
+            st.toast("Saved.", icon="✅")
+            st.rerun()
 
 
 def render() -> None:
-    """Orchestrate the full Settings tab — 5 cards + snapshot + save bar."""
-    render_search_terms_card()
-    render_arrangement_card()
-    render_title_denylist_card()
-    render_scorer_notes_card()
-    render_salary_card()
-    render_photo_card()
-    render_profile_snapshot()
+    """Orchestrate the full Settings tab: what to search (left), how to judge and present
+    (right), then the save bar. The columns stack on phones."""
+    search, profile = st.columns(2, gap="medium")
+    with search:
+        render_search_terms_card()
+        render_title_denylist_card()
+        render_arrangement_card()
+        render_salary_card()
+    with profile:
+        render_scorer_notes_card()
+        render_photo_card()
+        render_profile_snapshot()
     render_save_bar()

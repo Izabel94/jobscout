@@ -1,9 +1,14 @@
 [theme]
-primaryColor = "#1f2937"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#fafafa"
-textColor = "#1f2937"
-font = "sans serif"
+primaryColor = "#7337fc"
+backgroundColor = "#fdfdfd"
+secondaryBackgroundColor = "#f3f4f6"
+textColor = "#0c0d0f"
+font = "Manrope:https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap"
+baseRadius = "8px"
+borderColor = "#dfe1e5"
+
+[client]
+toolbarMode = "minimal"
 
 [server]
 headless = true

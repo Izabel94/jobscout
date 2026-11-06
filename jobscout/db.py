@@ -151,6 +151,9 @@ def list_pipeline_listings_legacy(statuses: list[ListingStatus], limit: int = 10
     return cast(list[dict[str, Any]], res.data)
 
 
+PIPELINE_STATUSES = ("scored", "drafted")  # what the dashboard lists
+
+
 def _apply_pipeline_filters(
     q: Any,
     *,
@@ -162,7 +165,7 @@ def _apply_pipeline_filters(
     """Apply the sidebar filter set to a Supabase query builder. Used by
     both list_pipeline_listings and count_pipeline_listings so the count
     chip-labels stay honest."""
-    q = q.in_("status", ("scored", "drafted"))
+    q = q.in_("status", PIPELINE_STATUSES)
     if apply_methods:
         q = q.in_("apply_method", tuple(apply_methods))
     if min_score > 0:
