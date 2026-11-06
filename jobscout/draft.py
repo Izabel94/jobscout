@@ -11,7 +11,8 @@ from jobscout.models import Draft, Listing, ListingStatus
 
 log = logging.getLogger("draft")
 
-_MODEL_DRAFT = "gemini-2.5-flash"  # free-tier; 2.5-pro has zero free quota
+_MODEL_DRAFT = "gemini-3.6-flash"  # newest Flash marked free-tier; Pro models have no free quota
+_MODEL_DRAFT_FALLBACK = "gemini-2.5-flash"
 # CV adaptation is a literal fact-preserving edit — use the deterministic
 # non-thinking model. 2.5-flash's variance intermittently dropped trailing
 # entries/years, failing _verify_cv_facts.
@@ -84,11 +85,16 @@ def draft_one(listing: Listing) -> Draft:
         "{{listing_full}}", f"{listing.title}\n\n{listing.description or ''}"
     )
 
-    # Cover letter: 2.5-flash for quality, but its free tier is ~20 req/day — on
-    # quota exhaustion fall back to flash-lite so drafting never hard-fails.
-    # Headroom leaves room for the thinking model's hidden reasoning.
+    # Cover letter: best free Flash for quality, then 2.5-flash (free tier ~20 req/day), then
+    # flash-lite so drafting never hard-fails. Headroom leaves room for hidden reasoning.
     try:
-        body = call_text(model=_MODEL_DRAFT, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
+        body = call_text(
+            model=_MODEL_DRAFT,
+            fallback_model=_MODEL_DRAFT_FALLBACK,
+            system="You write cover letters.",
+            user=rendered_prop,
+            max_tokens=3000,
+        )
     except LLMProviderError:
         body = call_text(model=_MODEL_CV, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
     cv_md = call_text(
