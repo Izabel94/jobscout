@@ -30,6 +30,23 @@ def _profile_embedding() -> NDArray[Any]:
     return cast(NDArray[Any], _model().encode("\n\n".join(parts), normalize_embeddings=True))
 
 
+@lru_cache(maxsize=1)
+def _target_role_embeddings() -> NDArray[Any] | None:
+    targets = [t for t in load_profile().get("required_skill_keywords") or [] if t.strip()]
+    if not targets:
+        return None
+    return cast(NDArray[Any], _model().encode(targets, normalize_embeddings=True))
+
+
 def cosine_to_profile(text: str) -> float:
+    """Best similarity to the whole profile or to any single target role.
+
+    The profile blend is dominated by past roles, so a career-change listing
+    ('Account Manager' for a media consultant) scores low against it; matching
+    each target role on its own keeps those listings."""
     embedding = cast(NDArray[Any], _model().encode(text, normalize_embeddings=True))
-    return float(np.dot(embedding, _profile_embedding()))
+    best = float(np.dot(embedding, _profile_embedding()))
+    targets = _target_role_embeddings()
+    if targets is not None:
+        best = max(best, float(np.max(targets @ embedding)))
+    return best
