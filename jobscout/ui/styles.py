@@ -1,6 +1,6 @@
 """Custom CSS injection. Streamlit's primitives + our theme config handle
 most layout; this file adds the small bits Streamlit can't theme natively:
-badge color classes, card border tweaks, score-pill background colors.
+badge color classes, the score tile, job-list rows and the detail header.
 """
 
 from __future__ import annotations
@@ -9,6 +9,38 @@ import streamlit as st
 
 _CSS = """
 <style>
+  /* Design tokens (OMR-inspired). New rules use these, never raw values, so sizes
+     scale with the user's font size and the layout follows the screen. */
+  :root {
+    --js-space-1:0.25rem; --js-space-2:0.5rem; --js-space-3:0.75rem; --js-space-4:1rem; --js-space-5:1.25rem;
+    --js-radius-control:0.5rem;
+    --js-text-xs:0.75rem; --js-text-s:0.8125rem; --js-text-m:0.875rem;
+    --js-text-l:clamp(1.125rem, 1rem + 0.6vw, 1.375rem);
+    --js-tile:2.5rem; --js-tile-big:3.5rem;
+    --js-ink:#0c0d0f; --js-text-subtle:#353a42; --js-text-subtlest:#6c7380;
+    --js-surface-1:#f8f9fb; --js-surface-2:#f3f4f6;
+    --js-primary:#7337fc; --js-primary-subtlest:#f4f2ff; --js-primary-subtle:#d8d4ff; --js-primary-text:#601ee3;
+    --js-danger-bg:#fee5e7; --js-danger-fg:#b91740; --js-danger-border:#fdced4;
+    --js-success-bg:#d1fae9; --js-success-fg:#065f4f;
+    --js-warning-bg:#fbe69c; --js-warning-fg:#824a11;
+    --js-mint-bg:#f1fcfb; --js-mint-fg:#146c71; --js-gold:#e39807;
+    --js-header-h:3.75rem;  /* Streamlit's fixed top bar */
+    --js-hairline:1px; --js-radius-pill:999px; --js-focus-w:2px;
+    /* Layout: the list starts at --js-list-w of the width, capped at --js-list-default-max-w;
+       the user can drag it up to --js-list-max-w. Both panes are as tall as the detail
+       pane's content, at least --js-pane-min-h; the list scrolls inside that. */
+    --js-list-w:38%; --js-list-default-max-w:34rem; --js-list-max-w:60%; --js-pane-min-h:70dvh;
+    --js-list-min-h:50dvh;  /* stacked on phones there's no detail pane beside the list to match */
+    --js-title-min-w:20rem;  /* below this the header actions wrap under the title */
+    --js-photo-w:7rem;
+    --js-row-title-lines:2;  /* list titles wrap to this many lines, then "…" */
+  }
+
+  /* Start content right under Streamlit's top bar instead of its ~6rem default gap */
+  [data-testid="stMainBlockContainer"] { padding-top:var(--js-header-h); }
+  .jobscout-wordmark { display:inline-block; background:var(--js-ink); color:#fff; font-weight:800;
+    font-size:var(--js-text-l); letter-spacing:0.02em; padding:0 var(--js-space-2); line-height:1.3; }
+
   /* Tab labels — Streamlit defaults render them small and muted */
   div[data-baseweb="tab-list"] button[role="tab"] p {
     font-size: 16px !important;
@@ -16,11 +48,13 @@ _CSS = """
   }
 
 
-  /* Score pill — colour by threshold class */
-  .jobscout-score { display:inline-block; padding:4px 10px; border-radius:14px; font-size:13px; font-weight:600; color:white; }
-  .jobscout-score-high { background:#16a34a; }
-  .jobscout-score-mid  { background:#ca8a04; }
-  .jobscout-score-low  { background:#9ca3af; }
+  /* Score tile — colour by threshold class */
+  .jobscout-score { display:inline-flex; align-items:center; justify-content:center; flex:none;
+    width:var(--js-tile); height:var(--js-tile); border-radius:var(--js-radius-control); font-size:1rem; font-weight:800; }
+  .jobscout-score-big { width:var(--js-tile-big); height:var(--js-tile-big); font-size:var(--js-text-l); }
+  .jobscout-score-high { background:var(--js-success-bg); color:var(--js-success-fg); }
+  .jobscout-score-mid  { background:var(--js-warning-bg); color:var(--js-warning-fg); }
+  .jobscout-score-low  { background:var(--js-surface-2); color:var(--js-text-subtle); }
 
   /* Derived-field badges */
   .jobscout-badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:500; margin-right:4px; }
@@ -35,41 +69,71 @@ _CSS = """
   .jobscout-badge-dropped { background:#fee2e2; color:#991b1b; }
   .jobscout-badge-blocked { background:#fff7ed; color:#9a3412; border:1px solid #fdba74; }
 
-  .jobscout-salary { font-size:13px; color:#166534; font-weight:600; margin:2px 0; }
-  .jobscout-salary-src { color:#9ca3af; font-weight:400; font-size:11px; }
-
-  /* Viewed-card left-border accent. The marker span is display:none itself;
-     CSS :has() picks it up to style the enclosing card.
-     data-test-scroll-behavior distinguishes the card-level stVerticalBlock
-     from the page-level one (only the card has it). */
-  .jobscout-viewed-marker { display: none; }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior]:has(.jobscout-viewed-marker) {
-    border-left: 4px solid #16a34a !important;
-  }
-
-  /* Card title row — favicon + title flex layout */
-  .jobscout-card-row { display:flex; align-items:center; gap:8px; }
-  .jobscout-card-title { font-weight:600; font-size:15px; }
+  .jobscout-badge-salary { background:var(--js-mint-bg); color:var(--js-mint-fg); }
+  .jobscout-salary { font-size:var(--js-text-xs); color:var(--js-mint-fg); font-weight:700; }
 
   /* Muted metadata row */
-  .jobscout-meta { color:#6b7280; font-size:13px; }
+  .jobscout-meta { color:var(--js-text-subtlest); font-size:var(--js-text-m); }
 
-  /* Scoring rationale callout */
-  .jobscout-rationale { background:#f0fdf4; border-left:3px solid #16a34a;
-    padding:8px 12px; font-size:13px; color:#374151; border-radius:0 6px 6px 0;
-    margin:8px 0; }
+  /* Header counts — one line instead of KPI tiles */
+  .jobscout-stats { display:flex; flex-wrap:wrap; gap:var(--js-space-1) var(--js-space-5);
+    color:var(--js-text-subtlest); font-size:var(--js-text-m); }
+  .jobscout-stats b { color:var(--js-ink); }
 
-  /* KPI hero tiles */
-  .jobscout-kpi-tile {
-    background:white; border:1px solid #eee; border-radius:10px; padding:14px;
-  }
-  .jobscout-kpi-label {
-    color:#666; font-size:11px; letter-spacing:0.05em; text-transform:uppercase;
-  }
-  .jobscout-kpi-value {
-    font-size:28px; font-weight:700; margin-top:4px;
-  }
-  .jobscout-kpi-suffix { color:#999; font-size:18px; }
+  /* Job list: scrolls on its own, sized to the screen. On phones the columns stack,
+     so the list gets less height and the selected job stays reachable below it. */
+  /* List width: user-resizable (handle at the column's bottom-right corner). min-width is
+     left to Streamlit, so phones still stack the columns. */
+  div[data-testid="stColumn"]:has(div.st-key-job-list) {
+    flex:0 0 auto !important; width:min(var(--js-list-w), var(--js-list-default-max-w)); max-width:var(--js-list-max-w);
+    overflow:auto; resize:horizontal; display:flex; flex-direction:column; }
+  div[data-testid="stColumn"]:has(div.st-key-job-detail) { flex:1 1 0 !important; min-width:0; }
+  /* Equal heights: the columns stretch to the taller one. The list's own rows must not make
+     the row taller (height:0 + grow), so the detail pane decides and the list scrolls inside. */
+  div[data-testid="stLayoutWrapper"]:has(> div.st-key-job-list) { flex:1 1 0; }  /* min-height stays auto: never smaller than the list's own minimum */
+  div.st-key-job-list { flex:1 1 0; height:0; min-height:var(--js-list-min-h); overflow-y:auto; }
+  div.st-key-job-detail { flex:1 1 auto; min-height:var(--js-pane-min-h); }
+
+  /* Job list row. The row's st.button is stretched over the whole row and made
+     invisible, so the row is one click target; its label stays the accessible name. */
+  .jobscout-row { display:grid; grid-template-columns:var(--js-tile) minmax(0,1fr) auto; gap:var(--js-space-3); align-items:center; }
+  .jobscout-row-text { min-width:0; }
+  .jobscout-row-title { font-size:var(--js-text-m); font-weight:600; line-height:1.3; color:var(--js-text-subtle);
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--js-row-title-lines); overflow:hidden; }
+  .jobscout-row-title-new { font-weight:800; color:var(--js-ink); }
+  .jobscout-row-sub { font-size:var(--js-text-s); color:var(--js-text-subtlest); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .jobscout-row-side { display:flex; flex-direction:column; align-items:flex-end; gap:var(--js-space-1);
+    font-size:var(--js-text-xs); color:var(--js-text-subtlest); }
+  .jobscout-row-star { color:var(--js-gold); }
+  .jobscout-new-dot { width:var(--js-space-2); height:var(--js-space-2); border-radius:var(--js-radius-pill); background:var(--js-primary); }
+  div[class*="st-key-row-"] {
+    position:relative; padding:var(--js-space-2); border-radius:var(--js-radius-control); border:var(--js-hairline) solid transparent; }
+  div[class*="st-key-row-"]:hover { background:var(--js-surface-1); }
+  div[class*="st-key-row-"]:has(.jobscout-row-selected) { background:var(--js-primary-subtlest); border-color:var(--js-primary); }
+  /* the row's button is invisible, so keyboard focus is shown on the row itself */
+  div[class*="st-key-row-"]:has(button:focus-visible) { outline:var(--js-focus-w) solid var(--js-primary); outline-offset:var(--js-hairline); }
+  /* Streamlit pulls markdown up by -1rem; inside a row that made the border cut the text */
+  div[class*="st-key-row-"] [data-testid="stMarkdownContainer"] { margin-bottom:0; }
+  /* overflow:hidden: a long title wraps the invisible label, and the button would
+     otherwise spill over the next row and catch its clicks */
+  div[class*="st-key-open-"] { position:absolute; inset:0; z-index:1; overflow:hidden; }
+  /* pinned to the row's edges (not height:100%), so taller two-line rows stay fully clickable */
+  div[class*="st-key-open-"] button { position:absolute; inset:0; width:auto; height:auto; min-height:0; opacity:0; }
+
+  /* Detail pane header */
+  /* Actions sit top right while the title still gets --js-title-min-w beside them; in a
+     narrower pane they wrap under the title. Follows the pane's own width on any device. */
+  div.st-key-detail-top > :first-child { flex:1 1 var(--js-title-min-w); min-width:0; }
+  /* actions hug the right edge, wrapped or not (the flex item is Streamlit's layout wrapper) */
+  div[data-testid="stLayoutWrapper"]:has(> div.st-key-detail-actions) { margin-left:auto; }
+  .jobscout-detail-head { display:flex; gap:var(--js-space-4); align-items:flex-start; }
+  .jobscout-detail-title { font-size:var(--js-text-l); font-weight:800; line-height:1.25; margin-bottom:var(--js-space-1); }
+  .jobscout-chips { display:flex; flex-wrap:wrap; gap:var(--js-space-1); margin:var(--js-space-2) 0 var(--js-space-4); }
+  .jobscout-chips .jobscout-badge { margin-right:0; }
+
+  /* Hide is icon-only: its label is visually hidden but stays the accessible name */
+  div[class*="st-key-remove-"] button [data-testid="stMarkdownContainer"] {
+    position:absolute; width:var(--js-hairline); height:var(--js-hairline); overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 
   /* Pagination status caption */
   .jobscout-pagination-status {
@@ -106,74 +170,30 @@ _CSS = """
     margin-top:8px; color:#999; font-size:12px;
   }
 
-  /* Mobile reflow — at narrow widths, soften the KPI hero so 4 tiles wrap
-     gracefully (Streamlit stacks st.columns on mobile, but the tile padding
-     can feel cramped). */
+  /* Mobile reflow — Streamlit stacks st.columns on narrow screens. */
   @media (max-width: 768px) {
-    .jobscout-kpi-tile { padding:12px; }
-    .jobscout-kpi-value { font-size:24px; }
     .jobscout-empty-callout { padding:24px 16px; }
     .jobscout-profile-snapshot { padding:14px; }
   }
 
-  /* Settings chip coloring — marker span (display:none) is dropped in the
-     same column as the chip button; CSS :has() finds the marker's nearest
-     stColumn ancestor and styles the button inside. */
-  .jobscout-chip-marker-search,
-  .jobscout-chip-marker-deny { display: none; }
+  /* Settings chips: remove-buttons keyed rm-term-* (search terms, purple) and rm-deny-* (denylist, red) */
+  div[class*="st-key-rm-term-"] button, div[class*="st-key-rm-deny-"] button {
+    border-radius:var(--js-radius-pill); font-size:var(--js-text-s); font-weight:600; line-height:1.2;
+    padding:var(--js-space-1) var(--js-space-3); min-height:0; max-width:100%; }
+  div[class*="st-key-rm-term-"] button p, div[class*="st-key-rm-deny-"] button p {
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }  /* one line; long words get "…" */
+  div[class*="st-key-rm-term-"], div[class*="st-key-rm-deny-"] { max-width:100%; }
+  div[class*="st-key-rm-term-"] button { background:var(--js-primary-subtlest); color:var(--js-primary-text);
+    border:var(--js-hairline) solid var(--js-primary-subtle); }
+  div[class*="st-key-rm-deny-"] button { background:var(--js-danger-bg); color:var(--js-danger-fg);
+    border:var(--js-hairline) solid var(--js-danger-border); }
 
-  /* Tight pill shape applied to ANY chip button (search or deny) */
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button,
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button {
-    border-radius: 14px;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.2;
-    padding: 4px 10px;
-    min-height: 0;
-  }
+  /* Settings: input + Add stay on one row; the input shrinks, the button never wraps away */
+  div[class*="st-key-add-row-"] { flex-wrap:nowrap; }
+  div[class*="st-key-add-row-"] > :first-child { flex:1 1 0; min-width:0; }
 
-  /* Search-term chips — blue */
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button {
-    background: #eff6ff !important;
-    color: #1e40af !important;
-    border: 1px solid #dbeafe !important;
-  }
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-search) [data-testid="stButton"] > button:hover {
-    background: #dbeafe !important;
-  }
-
-  /* Title-denylist chips — red */
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button {
-    background: #fee2e2 !important;
-    color: #991b1b !important;
-    border: 1px solid #fecaca !important;
-  }
-  div[data-testid="stColumn"]:has(.jobscout-chip-marker-deny) [data-testid="stButton"] > button:hover {
-    background: #fecaca !important;
-  }
-
-  /* Card Remove button — red so it reads as an actionable delete, not a
-     disabled secondary button. Same marker+:has() mechanism as the chips, but
-     descendant (not >) selector: the help= tooltip wraps the button in
-     stTooltipHoverTarget divs inside stButton. */
-  .jobscout-remove-marker { display: none; }
-  div[data-testid="stColumn"]:has(.jobscout-remove-marker) [data-testid="stButton"] button {
-    color: #b91c1c !important;
-    border: 1px solid #fecaca !important;
-  }
-  div[data-testid="stColumn"]:has(.jobscout-remove-marker) [data-testid="stButton"] button:hover {
-    color: #ffffff !important;
-    background: #dc2626 !important;
-    border-color: #dc2626 !important;
-  }
-
-  /* Bookmarked star — gold. Marker present only when the listing is starred. */
-  .jobscout-star-on-marker { display: none; }
-  div[data-testid="stColumn"]:has(.jobscout-star-on-marker) [data-testid="stButton"] button {
-    color: #f5b301 !important;
-    border: 1px solid #f5b301 !important;
-  }
+  /* Settings: CV photo preview */
+  .jobscout-photo { width:var(--js-photo-w); border-radius:var(--js-radius-control); display:block; }
 </style>
 """
 

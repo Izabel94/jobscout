@@ -10,45 +10,33 @@ from typing import Any
 import streamlit as st
 
 from jobscout.db import (
+    PIPELINE_STATUSES,
     count_listings_new_today,
     count_pipeline_listings,
     count_submissions_last_7d,
     count_submissions_today_external,
+    get_listing_by_id,
     list_pipeline_listings,
+    mark_listing_viewed,
 )
-from jobscout.ui.card import render as render_card
+from jobscout.ui.card import render_detail, render_row
 
 APPLY_DAILY_CAP = 10
 
 
-def _kpi_tile(label: str, value_html: str) -> None:
-    st.markdown(
-        f'<div class="jobscout-kpi-tile">'
-        f'<div class="jobscout-kpi-label">{label}</div>'
-        f'<div class="jobscout-kpi-value">{value_html}</div>'
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
-
 def render_kpi_hero() -> None:
+    """One quiet line of counts instead of four big tiles."""
     new_today = count_listings_new_today()
-    applied_today = count_submissions_today_external()
+    remaining = max(0, APPLY_DAILY_CAP - count_submissions_today_external())
     in_dashboard = count_pipeline_listings(**_current_filter_args())
     submitted_7d = count_submissions_last_7d()
-    remaining = max(0, APPLY_DAILY_CAP - applied_today)
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        _kpi_tile("New today", str(new_today))
-    with col2:
-        _kpi_tile("Auto-apply remaining",
-                  f'<span>{remaining}</span><span class="jobscout-kpi-suffix"> / {APPLY_DAILY_CAP}</span>')
-    with col3:
-        _kpi_tile("In dashboard", str(in_dashboard))
-    with col4:
-        _kpi_tile("Submitted (7d)", str(submitted_7d))
-    st.divider()
+    st.markdown(
+        f'<div class="jobscout-stats"><span><b>{new_today}</b> new today</span>'
+        f"<span><b>{remaining} of {APPLY_DAILY_CAP}</b> auto-applies left today</span>"
+        f"<span><b>{in_dashboard}</b> in dashboard</span>"
+        f"<span><b>{submitted_7d}</b> submitted this week</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 _PAGE_SIZE = 20
@@ -150,6 +138,47 @@ def _current_filter_args() -> dict[str, Any]:
     }
 
 
+_SELECTED_KEY = "selected_listing_id"
+
+
+def _select(listing_id: str) -> None:
+    """Row click: show that job and mark it viewed (viewed = the user opened it, as before)."""
+    st.session_state[_SELECTED_KEY] = listing_id
+    if not st.session_state.get(f"marked-{listing_id}"):
+        mark_listing_viewed(listing_id)
+        st.session_state[f"marked-{listing_id}"] = True
+
+
+def _clear_selection() -> None:
+    st.session_state.pop(_SELECTED_KEY, None)
+
+
+def _selected_listing(listings: list[dict[str, Any]], only_unviewed: bool) -> dict[str, Any] | None:
+    """The clicked job, else the first one on the page.
+
+    Under 'Only unviewed', opening a job removes it from the list; it's fetched directly so it
+    doesn't jump away while you work on it. Otherwise a job that left the list is not kept,
+    and neither is anything that left the pipeline (skipped, hidden, submitted...)."""
+    selected_id = st.session_state.get(_SELECTED_KEY)
+    if selected_id:
+        for listing in listings:
+            if listing.get("id") == selected_id:
+                return listing
+        if only_unviewed:
+            fetched = get_listing_by_id(selected_id)
+            if fetched and fetched.get("status") in PIPELINE_STATUSES:
+                return fetched
+    return listings[0] if listings else None
+
+
+def _reset_selection_on_filter_change(filters: dict[str, Any], sort_by: str) -> None:
+    """A new filter or sort shows a new list; start from its first job."""
+    signature = repr((sorted(filters.items()), sort_by))
+    if st.session_state.get("selection-filter-signature") != signature:
+        st.session_state["selection-filter-signature"] = signature
+        _clear_selection()
+
+
 def render_listing_list() -> None:
     filters = _current_filter_args()
     sb = st.session_state.get("sort_by", "first_seen")
@@ -162,37 +191,48 @@ def render_listing_list() -> None:
     if total == 0:
         render_empty_state()
         return
+    if not listings and page > 0:  # the last page emptied (e.g. 'Only unviewed'): step back
+        st.session_state["page"] = page - 1
+        st.rerun()
 
-    for listing in listings:
-        render_card(listing)
+    _reset_selection_on_filter_change(filters, sb)
+    selected = _selected_listing(listings, filters["only_unviewed"])
+    col_list, col_detail = st.columns([2, 3], gap="medium")
+    with col_list:
+        with st.container(border=True, key="job-list"):  # height: CSS, follows the screen
+            for listing in listings:
+                render_row(listing, selected=listing is selected, on_select=_select)
+        _render_pagination(page, offset, total)
+    with col_detail, st.container(border=True, key="job-detail"):
+        if selected is not None and selected.get("id"):
+            render_detail(selected, on_close=_clear_selection)
 
+
+def _render_pagination(page: int, offset: int, total: int) -> None:
     start = offset + 1
     end = min(offset + _PAGE_SIZE, total)
-    nav_cols = st.columns([2, 4, 2])
+    nav_cols = st.columns([2, 4, 2], vertical_alignment="center")
     with nav_cols[0]:
-        if page > 0:
-            if st.button("← Previous", key="page-prev"):
-                st.session_state["page"] = page - 1
-                st.rerun()
+        if page > 0 and st.button("← Previous", key="page-prev"):
+            st.session_state["page"] = page - 1
+            _clear_selection()
+            st.rerun()
     with nav_cols[1]:
         st.markdown(
-            f'<div class="jobscout-pagination-status">Showing {start}–{end} of {total}</div>',
+            f'<div class="jobscout-pagination-status">{start}-{end} of {total}</div>',
             unsafe_allow_html=True,
         )
     with nav_cols[2]:
-        if end < total:
-            if st.button("Next →", key="page-next"):
-                st.session_state["page"] = page + 1
-                st.rerun()
+        if end < total and st.button("Next →", key="page-next"):
+            st.session_state["page"] = page + 1
+            _clear_selection()
+            st.rerun()
 
 
 def render_empty_state() -> None:
     filters = _current_filter_args()
     any_filter_active = (
-        filters["apply_methods"]
-        or filters["min_score"] > 0
-        or filters["only_unviewed"]
-        or filters["only_bookmarked"]
+        filters["apply_methods"] or filters["min_score"] > 0 or filters["only_unviewed"] or filters["only_bookmarked"]
     )
     if any_filter_active:
         st.info("No listings match the current filters. Adjust the sidebar to see more.")
@@ -211,6 +251,7 @@ def render_empty_state() -> None:
         return
 
     from jobscout.ui.card import short_relative_time
+
     ago = short_relative_time(last_run.get("started_at"))
     count = last_run.get("listings_new") or 0
     st.markdown(
@@ -226,8 +267,10 @@ def _last_source_run():
     """Most recent source_runs row or None."""
     try:
         from jobscout.db import _client
+
         r = (
-            _client().table("source_runs")
+            _client()
+            .table("source_runs")
             .select("started_at,listings_found,listings_new,error")
             .order("started_at", desc=True)
             .limit(1)
@@ -235,6 +278,7 @@ def _last_source_run():
         )
         if r.data:
             from datetime import datetime
+
             row = r.data[0]
             if isinstance(row.get("started_at"), str):
                 row["started_at"] = datetime.fromisoformat(row["started_at"].replace("Z", "+00:00"))
@@ -246,11 +290,13 @@ def _last_source_run():
 
 def safe_render(fn):
     """Wrap a render function in try/except — show friendly error + debug disclosure."""
+
     def wrapper(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
             import traceback
+
             st.markdown(
                 '<div class="jobscout-error-callout">'
                 '<div class="jobscout-error-title">Something broke. The operator has been notified.</div>'
@@ -261,10 +307,14 @@ def safe_render(fn):
                 st.code(traceback.format_exc())
             try:
                 from jobscout.db import _client
-                _client().table("source_runs").insert({
-                    "source": "ui",
-                    "error": str(e)[:1000],
-                }).execute()
+
+                _client().table("source_runs").insert(
+                    {
+                        "source": "ui",
+                        "error": str(e)[:1000],
+                    }
+                ).execute()
             except Exception:
                 pass
+
     return wrapper
