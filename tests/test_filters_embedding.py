@@ -21,6 +21,7 @@ def _profile(monkeypatch):
     from jobscout import embeddings
 
     embeddings._profile_embedding.cache_clear()
+    embeddings._target_role_embeddings.cache_clear()
 
 
 def _l(t: str, d: str) -> Listing:
@@ -41,3 +42,33 @@ def test_irrelevant_drops() -> None:
         "Looking for a roof contractor in Texas. Must have insurance.",
     )
     assert pass_embedding(listing) is False
+
+
+def test_career_change_listing_passes_on_target_role(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "jobscout.embeddings.load_profile",
+        lambda: {
+            "anchor_summaries": [
+                {
+                    "title": "Programmatic media consultant",
+                    "summary": "Planned and bought programmatic display and video inventory via DSPs (DV360, "
+                    "The Trade Desk), optimised CPM, viewability and brand-safety for agency clients.",
+                },
+                {
+                    "title": "Performance marketing lead",
+                    "summary": "Ran Google Ads and Meta campaigns, ROAS reporting, attribution modelling and "
+                    "media budget pacing.",
+                },
+            ],
+            "required_skill_keywords": ["Key Account Manager", "Solutions Consultant"],
+        },
+    )
+    from jobscout import embeddings
+
+    embeddings._profile_embedding.cache_clear()
+    embeddings._target_role_embeddings.cache_clear()
+    listing = _l(
+        "Key Account Manager (m/w/d)",
+        "Betreuung unserer Schlüsselkunden im Lebensmitteleinzelhandel, Jahresgespräche, Konditionen, Umsatzplanung.",
+    )
+    assert pass_embedding(listing) is True
