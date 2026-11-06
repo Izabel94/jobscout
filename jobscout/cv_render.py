@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 import html as html_lib
-import mimetypes
+import io
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,12 +18,13 @@ from typing import TYPE_CHECKING
 import markdown as md
 from jinja2 import Template
 
+from jobscout.config_loader import load_profile
+
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 _TEMPLATE_PATH = _CONFIG_DIR / "templates" / "cv.html.j2"
-_PHOTO_PATH = _CONFIG_DIR / "profile_photo.jpg"
 
 _H3_SPLIT_RE = re.compile(r"<h3>([^<|]+?)\s*\|\s*([^<]+?)</h3>")
 _ROLE_LINE_RE = re.compile(
@@ -47,14 +48,14 @@ def _split_header(html: str) -> tuple[str, str]:
     return match.group(1), html[match.end():]
 
 
+def _photo_b64() -> str | None:
+    """The CV photo uploaded in Settings (base64 JPEG on the profile), or None."""
+    return load_profile().get("photo_jpeg_b64") or None
+
+
 def _photo_data_uri() -> str | None:
-    if not _PHOTO_PATH.exists():
-        return None
-    mime, _ = mimetypes.guess_type(_PHOTO_PATH.name)
-    if not mime:
-        mime = "image/jpeg"
-    data = base64.b64encode(_PHOTO_PATH.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{data}"
+    b64 = _photo_b64()
+    return f"data:image/jpeg;base64,{b64}" if b64 else None
 
 
 def _normalize_bullets(cv_md: str) -> str:
@@ -121,7 +122,8 @@ def cv_markdown_to_pdf_bytes(cv_md: str) -> bytes:
     pdf.add_page()
     w = pdf.epw
     c1, c2 = w * 0.68, w * 0.32
-    photo = _PHOTO_PATH if _PHOTO_PATH.exists() else None
+    photo_b64 = _photo_b64()
+    photo = io.BytesIO(base64.b64decode(photo_b64)) if photo_b64 else None
     head_w = w - 26 if photo else w
     expect_contact = False
 
@@ -131,7 +133,7 @@ def cv_markdown_to_pdf_bytes(cv_md: str) -> bytes:
             continue
         if line.startswith("# "):
             if photo:
-                pdf.image(str(photo), x=pdf.w - 15 - 22, y=11, w=22)
+                pdf.image(photo, x=pdf.w - 15 - 22, y=11, w=22)
             pdf.set_font("Helvetica", "B", 17)
             pdf.multi_cell(head_w, 9, _plain(line[2:]), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             expect_contact = True

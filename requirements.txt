@@ -20,6 +20,8 @@ typing-extensions>=4.0,<5
 # system libs). markdown + jinja2 (ships with streamlit) back the worker's
 # Chrome-printed HTML path.
 fpdf2>=2.8,<3
+# CV photo upload in Settings: resize + JPEG-encode (also a streamlit dependency).
+pillow>=12,<13
 markdown>=3.10,<4
 # Intentionally NO lxml — Streamlit Cloud lacks libxml2-dev system packages
 # so lxml fails to build from sdist. BS4 falls back to stdlib `html.parser`.
