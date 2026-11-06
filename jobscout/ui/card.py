@@ -257,10 +257,11 @@ def render(listing: dict[str, Any]) -> None:
         if badges_html:
             st.markdown(badges_html, unsafe_allow_html=True)
 
+        detail_key = f"exp-{listing.get('id', '')}"
         detail = st.expander(
             "View detail + draft",
             expanded=False,
-            key=f"exp-{listing.get('id', '')}",
+            key=detail_key,
             on_change="rerun",
         )
         # Mark viewed only when the expander is actually OPENED. Streamlit runs
@@ -377,3 +378,26 @@ def render(listing: dict[str, Any]) -> None:
                     src = (listing.get("source") or "").lower()
                     label = "Open in LinkedIn ↗" if src == "linkedin" else "Open original posting ↗"
                     st.link_button(label, url=listing.get("url", "#"))
+
+            st.button("▲ Einklappen", key=f"collapse-{listing.get('id', '')}", on_click=_collapse, args=(detail_key,))
+        if st.session_state.get(_SCROLL_TO_KEY) == detail_key:
+            del st.session_state[_SCROLL_TO_KEY]
+            _scroll_into_view(detail_key)
+
+
+_SCROLL_TO_KEY = "scroll-to-expander"
+
+
+def _collapse(expander_key: str) -> None:
+    """Close the detail expander from its bottom and remember to scroll back to it."""
+    st.session_state[expander_key] = False
+    st.session_state[_SCROLL_TO_KEY] = expander_key
+
+
+def _scroll_into_view(expander_key: str) -> None:
+    # ponytail: Streamlit tags keyed elements with `st-key-<key>`; scroll the collapsed header back into view.
+    st.html(
+        f"<script>setTimeout(() => document.querySelector('.st-key-{expander_key} summary')"
+        "?.scrollIntoView({block: 'center', behavior: 'smooth'}), 50);</script>",
+        unsafe_allow_javascript=True,
+    )
