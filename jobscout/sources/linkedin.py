@@ -94,8 +94,7 @@ class LinkedInSource(SourceAdapter):
                 location=self.location,
                 results_wanted=self.policy.max_results_per_run or 15,
                 hours_old=72,
-                is_remote=True,
-                job_type="contract",
+                job_type="fulltime",
                 linkedin_fetch_description=True,
                 description_format="html",
             )
