@@ -339,8 +339,20 @@ def render(listing: dict[str, Any]) -> None:
                     mime="application/pdf",
                     key=f"dl-cv-{listing['id']}",
                 )
-            else:
-                st.caption("No draft generated yet — run `make draft` after scoring.")
+            elif listing.get("id") and st.button(
+                "Draft cover letter & adapt CV", key=f"draft-{listing['id']}", type="primary"
+            ):
+                # Ported from sidegig: drafting is on demand, so no LLM call is spent on listings he skips.
+                from jobscout.draft import draft_one
+                from jobscout.models import Listing
+
+                with st.spinner("calling LLM…"):
+                    try:
+                        draft_one(Listing.model_validate(listing))
+                        st.success("drafted")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"draft failed: {e}")
 
             col_left, col_right = st.columns([3, 2])
             with col_left:
@@ -362,6 +374,8 @@ def render(listing: dict[str, Any]) -> None:
                             "application. Review it, then click Submit yourself. "
                             "(Keep your apply Chrome running.)"
                         )
+                    elif not draft:
+                        st.caption("Draft first — Apply uploads that cover letter + CV.")
                     elif st.button("Apply", key=f"apply-{listing.get('id', '')}", type="primary"):
                         if listing.get("id"):
                             insert_apply_request(

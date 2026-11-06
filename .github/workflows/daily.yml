@@ -69,9 +69,6 @@ jobs:
       - name: Score
         run: poetry run python -m jobscout.score
 
-      - name: Draft
-        run: poetry run python -m jobscout.draft
-
       # Digest of new high-scoring listings to the GHA log (no email — user
       # opted out). Runs even if an earlier stage failed.
       - name: Print digest to GHA log
