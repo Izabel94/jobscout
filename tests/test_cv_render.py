@@ -1,6 +1,19 @@
+import base64
 from unittest.mock import MagicMock
 
-from jobscout.cv_render import cv_markdown_to_pdf
+import pytest
+
+from jobscout.cv_render import cv_markdown_to_pdf, cv_markdown_to_pdf_bytes
+
+
+@pytest.fixture(autouse=True)
+def _no_photo(monkeypatch):
+    monkeypatch.setattr("jobscout.cv_render.load_profile", lambda: {})
+
+
+def _profile_with_photo(monkeypatch, jpeg: bytes) -> None:
+    b64 = base64.b64encode(jpeg).decode("ascii")
+    monkeypatch.setattr("jobscout.cv_render.load_profile", lambda: {"photo_jpeg_b64": b64})
 
 
 def test_cv_markdown_to_pdf_calls_set_content_and_pdf(tmp_path):
@@ -28,8 +41,7 @@ def test_cv_markdown_to_pdf_calls_set_content_and_pdf(tmp_path):
     assert pdf_kwargs.get("path") == str(out)
 
 
-def test_cv_markdown_to_pdf_renders_without_photo_when_file_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr("jobscout.cv_render._PHOTO_PATH", tmp_path / "nope.jpg")
+def test_cv_markdown_to_pdf_renders_without_photo_when_profile_has_none(tmp_path):
     page = MagicMock()
     cv_markdown_to_pdf("# Test\n\nbody", tmp_path / "cv.pdf", page=page)
     html_arg = page.set_content.call_args.args[0]
@@ -37,11 +49,23 @@ def test_cv_markdown_to_pdf_renders_without_photo_when_file_missing(tmp_path, mo
     assert "<h1>Test</h1>" in html_arg
 
 
-def test_cv_markdown_to_pdf_embeds_photo_data_uri_when_file_present(tmp_path, monkeypatch):
-    photo = tmp_path / "profile_photo.jpg"
-    photo.write_bytes(b"\xff\xd8\xff\xe0fake-jpeg-bytes")
-    monkeypatch.setattr("jobscout.cv_render._PHOTO_PATH", photo)
+def test_cv_markdown_to_pdf_embeds_photo_from_profile(tmp_path, monkeypatch):
+    _profile_with_photo(monkeypatch, b"\xff\xd8\xff\xe0fake-jpeg-bytes")
     page = MagicMock()
     cv_markdown_to_pdf("# Test", tmp_path / "cv.pdf", page=page)
     html_arg = page.set_content.call_args.args[0]
     assert "data:image/jpeg;base64," in html_arg
+
+
+def test_cv_pdf_bytes_embeds_profile_photo(monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (60, 80), "red").save(buf, "JPEG")
+    without = cv_markdown_to_pdf_bytes("# Test\n\nbody")
+    _profile_with_photo(monkeypatch, buf.getvalue())
+    with_photo = cv_markdown_to_pdf_bytes("# Test\n\nbody")
+    assert b"/Subtype /Image" in with_photo
+    assert b"/Subtype /Image" not in without

@@ -5,7 +5,11 @@ Edits accumulate in st.session_state['pending_profile']; the save bar
 
 from __future__ import annotations
 
+import base64
+from io import BytesIO
+
 import streamlit as st
+from PIL import Image, ImageOps
 
 from jobscout.config_loader import clear_profile_cache, load_profile
 from jobscout.db import upsert_profile
@@ -147,6 +151,36 @@ def render_salary_card() -> None:
         p["target_rate_floor_eur"] = val if val > 0 else None
 
 
+def cv_photo_b64(data: bytes) -> str:
+    """Normalise an uploaded photo for the CV: upright, RGB JPEG, at most 600x800, base64."""
+    im = ImageOps.exif_transpose(Image.open(BytesIO(data))).convert("RGB")
+    im.thumbnail((600, 800))
+    out = BytesIO()
+    im.save(out, "JPEG", quality=88)
+    return base64.b64encode(out.getvalue()).decode("ascii")
+
+
+def render_photo_card() -> None:
+    p = _load()
+    with st.container(border=True):
+        st.markdown("**CV photo**")
+        st.caption("Shown top right on every CV PDF — uploads and downloads alike.")
+        col_img, col_ctl = st.columns([1, 3])
+        with col_ctl:
+            upload = st.file_uploader("Upload photo", type=["jpg", "jpeg", "png"], key="photo-upload")
+            # Apply each upload once, so "Remove" isn't undone by the file still sitting in the uploader.
+            if upload is not None and st.session_state.get("photo-upload-applied") != upload.file_id:
+                p["photo_jpeg_b64"] = cv_photo_b64(upload.getvalue())
+                st.session_state["photo-upload-applied"] = upload.file_id
+            if p.get("photo_jpeg_b64") and st.button("Remove photo", key="photo-remove"):
+                p["photo_jpeg_b64"] = None
+        with col_img:
+            if p.get("photo_jpeg_b64"):
+                st.image(base64.b64decode(p["photo_jpeg_b64"]), width=110)
+            else:
+                st.caption("No photo yet")
+
+
 def render_profile_snapshot() -> None:
     p = _load()
     skills = ", ".join((p.get("skills") or [])[:5])
@@ -197,5 +231,6 @@ def render() -> None:
     render_title_denylist_card()
     render_scorer_notes_card()
     render_salary_card()
+    render_photo_card()
     render_profile_snapshot()
     render_save_bar()
