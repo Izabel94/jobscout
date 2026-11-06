@@ -44,6 +44,13 @@ def test_build_score_prompt_handles_minimal_profile():
     listing = {"title": "X", "description": "Y"}
     rendered = _build_score_prompt({"full_name": "X"}, listing)
     assert "{{" not in rendered
+    assert "# Target roles" not in rendered
+
+
+def test_build_score_prompt_lists_target_roles_for_career_change():
+    profile = {"full_name": "X", "required_skill_keywords": ["Solutions Consultant", " ", "Account Manager"]}
+    rendered = _build_score_prompt(profile, {"title": "X", "description": "Y"})
+    assert "# Target roles (what the candidate wants next)\n\n- Solutions Consultant\n- Account Manager\n" in rendered
 
 
 @patch("jobscout.score.call_json")

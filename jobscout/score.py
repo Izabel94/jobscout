@@ -27,8 +27,15 @@ def _build_score_prompt(profile: dict, listing: dict) -> str:
     user_pref_block = ""
     if notes:
         user_pref_block = "# User preferences (mandatory — apply as a hard filter)\n\n" f"{notes}\n\n"
+    targets = [t.strip() for t in profile.get("required_skill_keywords") or [] if t.strip()]
+    target_roles_block = ""
+    if targets:
+        target_roles_block = (
+            "# Target roles (what the candidate wants next)\n\n" + "\n".join(f"- {t}" for t in targets) + "\n\n"
+        )
     return (
         _PROMPT.replace("{{candidate_block}}", render_candidate_block(profile))
+        .replace("{{target_roles_block}}", target_roles_block)
         .replace("{{user_pref_block}}", user_pref_block)
         .replace("{{title}}", listing.get("title", "") or "")
         .replace("{{description}}", (listing.get("description") or "")[:3000])

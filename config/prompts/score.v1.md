@@ -4,7 +4,7 @@ You score full-time job listings for a single candidate.
 
 {{candidate_block}}
 
-{{user_pref_block}}# Listing
+{{target_roles_block}}{{user_pref_block}}# Listing
 
 **Title:** {{title}}
 
@@ -20,9 +20,9 @@ You score full-time job listings for a single candidate.
 
 Rate this listing 0–100 for how well it fits the candidate above. Weight in this order:
 
-1. **Role family + industry overlap** with the candidate's current role and recent experience. A Performance Marketing role for a Performance Marketer scores higher than a Data Analyst role for the same person, even if both list "analytics" as a skill.
-2. **Skill match** — verify the candidate's skills cover the listing's must-haves; named tools / DSPs / platforms matter more than generic terms.
-3. **Career trajectory** — does this role plausibly advance the candidate from their current title, or is it a sideways / regression move?
+1. **Target role fit** — if Target roles are listed above, they are the roles the candidate WANTS next, and they may deliberately differ from their past roles (career change). A listing in one of those role families scores high even when the candidate's past titles and industry don't match. Never penalise a target-role listing as "a mismatch with the candidate's background" or "a sideways move". Without Target roles, use role family + industry overlap with the candidate's current role instead.
+2. **Transferable skills** — do the candidate's skills and experience plausibly carry into this role (e.g. ad-tech / media knowledge into a solutions or account role)? Judge the listing's must-haves; a hard technical requirement the candidate clearly lacks (e.g. a degree in engineering, years of software development) is a real gap.
+3. **Seniority** — is the level plausible for the candidate's years of experience?
 4. **User preferences** above (if present) — apply as a hard filter, not a soft signal. An anti-pattern flagged there overrides a high skill-match score.
 
 # Agency check (hard filter — overrides everything else)
@@ -35,11 +35,11 @@ Decide from the company name AND the description (e.g. "unser Kunde", "im Auftra
 
 # Calibration
 
-- 90–100: strong match across role family, industry, and skills
-- 70–89: solid match with one mild gap (e.g. adjacent industry, one missing platform)
+- 90–100: a target role (or, without targets, the current role family) with strongly transferable skills
+- 70–89: a target role with one real gap (e.g. one missing must-have tool, slightly too senior)
 - 50–69: partial — only consider if user preferences explicitly favour it
 - < 50: weak — recommend drop
-- 0: agency posting (see Agency check) — not an in-house role
+- 0: agency posting (see Agency check) — not an in-house role. Use 0 for nothing else; a non-target role still gets a weak score (< 50)
 
 # Output
 
