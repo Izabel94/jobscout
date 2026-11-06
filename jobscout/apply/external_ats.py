@@ -641,6 +641,7 @@ def _dismiss_consent_banner(page: Page) -> bool:
             'button#onetrust-accept-btn-handler',
             '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
             'button.cookie-accept-all',
+            'button[data-ui="cookie-consent-accept"]',  // Workable — its modal backdrop blocks every field click
           ];
           for (const sel of trySelectors) {
             const el = document.querySelector(sel);
