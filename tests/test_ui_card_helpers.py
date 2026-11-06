@@ -73,3 +73,12 @@ def test_job_type_badge_class():
 def test_apply_method_badge_class():
     assert apply_method_badge_class(ApplyMethod.EXTERNAL_APPLY) == "jobscout-badge jobscout-badge-external"
     assert apply_method_badge_class(ApplyMethod.EASY_APPLY) == "jobscout-badge jobscout-badge-easy"
+
+
+def test_city_keeps_only_first_location_part():
+    from jobscout.ui.card import city
+
+    assert city("Hamburg, Hamburg, Germany") == "Hamburg"
+    assert city("Wedel") == "Wedel"
+    assert city("") == ""
+    assert city(None) == ""
