@@ -5,9 +5,9 @@ from unittest.mock import patch
 import pytest
 
 from jobscout.draft import (
+    _PROMPT_CV,
     _build_proposal_prompt,
     _extract_contact_name,
-    _PROMPT_CV,
     _verify_cv_facts,
     draft_one,
 )
@@ -126,8 +126,8 @@ def test_verify_cv_facts_finds_dropped_header():
 
 
 def test_verify_cv_facts_finds_dropped_year():
-    base = "# X\n\n### Acme Corp | Berlin\n*2019 – 2020*\n"  # noqa: RUF001
-    adapted = "# X\n\n### Acme Corp | Berlin\n*– 2020*\n"  # noqa: RUF001
+    base = "# X\n\n### Acme Corp | Berlin\n*2019 – 2020*\n"
+    adapted = "# X\n\n### Acme Corp | Berlin\n*– 2020*\n"
     violations = _verify_cv_facts(base, adapted)
     assert any("dropped years" in v for v in violations)
 
@@ -147,8 +147,8 @@ def test_extract_contact_name_absent():
 
 
 def test_verify_cv_facts_clean_pass():
-    base = "# X\n\n### Acme | Berlin\n*2019 – 2020*\n- bullet\n"  # noqa: RUF001
-    adapted = "# X\n\n### Acme | Berlin\n*2019 – 2020*\n- bullet\n"  # noqa: RUF001
+    base = "# X\n\n### Acme | Berlin\n*2019 – 2020*\n- bullet\n"
+    adapted = "# X\n\n### Acme | Berlin\n*2019 – 2020*\n- bullet\n"
     assert _verify_cv_facts(base, adapted) == []
 
 
@@ -167,3 +167,28 @@ def test_cv_prompt_renders_without_unfilled_placeholders():
         "{{listing_full}}", "title\n\ndesc"
     )
     assert "{{" not in rendered
+
+
+_BULLETS_BASE = (
+    "# X\n\n### Mediaplus | Hamburg\n\n"
+    "• **Agency & Partner Management:** Zentrale Schnittstelle für die Koordination kanalübergreifender "
+    "Mediaplanung, Budgetallokation über digitale und programmatische Werbekanäle hinweg.\n"
+    "• Beratung bei der Konzeption und Umsetzung programmatischer Kampagnen.\n"
+)
+
+
+def test_verify_cv_facts_accepts_reordered_bullets_with_listing_keywords():
+    adapted = (
+        "# X\n\n### Mediaplus | Hamburg\n\n"
+        "• Beratung bei der Konzeption und Umsetzung programmatischer Kampagnen (DV360, CTV).\n"
+        "• **Agency & Partner Management:** Zentrale Schnittstelle für die Koordination kanalübergreifender "
+        "Mediaplanung und Media-Investments, Budgetallokation über digitale und programmatische Werbekanäle hinweg.\n"
+    )
+    assert _verify_cv_facts(_BULLETS_BASE, adapted) == []
+
+
+def test_verify_cv_facts_rejects_a_bullet_the_base_cv_does_not_have():
+    adapted = _BULLETS_BASE + "• Erstellung von Zielgruppen- und Mediaplanungen.\n"
+    assert _verify_cv_facts(_BULLETS_BASE, adapted) == [
+        "bullet not in base CV: Erstellung von Zielgruppen- und Mediaplanungen."
+    ]

@@ -26,8 +26,13 @@ verbatim — no human will rewrite it. Output ONLY the letter text.
    - Lead with ONE specific match between the candidate's experience and the
      listing — a named skill, a tool / DSP / platform from the candidate's
      profile, a directly-comparable past role, or an industry overlap.
-   - Then expand on why the candidate's career trajectory aligns with this
-     role. Plain factual tone, no superlatives, no buzzwords.
+   - Then describe the relevant parts of the candidate's work as they are:
+     what the candidate did, in the profile's own terms. Use the listing's
+     keywords where the profile truthfully covers them, so screening tools
+     find them.
+   - Understated, factual tone — let the facts speak. No superlatives, no
+     buzzwords, no self-praise ("tiefes Verständnis", "umfassende Expertise",
+     "gewinnbringend", "passionate", "proven track record").
    - Optionally, one sentence on motivation if the listing's company, mission,
      or location creates a clear honest hook.
 
@@ -42,6 +47,11 @@ verbatim — no human will rewrite it. Output ONLY the letter text.
   tools, certifications, or outcomes.
 - Do not state seniority levels (`Senior`, `Lead`) the candidate has not
   actually held.
+- Keep the candidate's part in the work exactly as the profile states it.
+  If the profile says the candidate *coordinated* or *advised on* something,
+  do not write that they planned, created, built or are experienced in doing
+  it themselves (e.g. "Koordination der Mediaplanung" is not "Erfahrung in
+  der Mediaplanung").
 
 # Language
 

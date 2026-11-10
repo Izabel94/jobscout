@@ -2,6 +2,7 @@
 
 import logging
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from jobscout.config_loader import load_cv_markdown, load_profile, render_candidate_block
@@ -17,11 +18,11 @@ _MODEL_DRAFT_FALLBACK = "gemini-2.5-flash"
 # non-thinking model. 2.5-flash's variance intermittently dropped trailing
 # entries/years, failing _verify_cv_facts.
 _MODEL_CV = "gemini-3.1-flash-lite"
-_PROMPT_VERSIONS = {"draft_proposal": "v1", "draft_cv": "v1"}  # spec decision
+_PROMPT_VERSIONS = {"draft_proposal": "v2", "draft_cv": "v2"}  # spec decision
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
-_PROMPT_PROP = (_PROMPTS_DIR / "draft_proposal.v1.md").read_text(encoding="utf-8")
-_PROMPT_CV = (_PROMPTS_DIR / "draft_cv.v1.md").read_text(encoding="utf-8")
+_PROMPT_PROP = (_PROMPTS_DIR / "draft_proposal.v2.md").read_text(encoding="utf-8")
+_PROMPT_CV = (_PROMPTS_DIR / "draft_cv.v2.md").read_text(encoding="utf-8")
 
 
 def _extract_entry_headers(cv_md: str) -> list[str]:
@@ -51,17 +52,34 @@ def _verify_cv_facts(cv_base_md: str, adapted_md: str) -> list[str]:
     dropped = base_years - adapted_years
     if dropped:
         violations.append(f"dropped years: {sorted(dropped)}")
+    violations += [f"bullet not in base CV: {b[:80]}" for b in _invented_bullets(cv_base_md, adapted_md)]
     return violations
+
+
+_BULLET_RE = re.compile(r"^\s*[-*•]\s+")
+# Inserting a few listing keywords into a bullet keeps it well above this; a new claim lands far below.
+_BULLET_MATCH_MIN = 0.6
+
+
+def _bullets(cv_md: str) -> list[str]:
+    return [_BULLET_RE.sub("", line).replace("*", "").strip() for line in cv_md.splitlines() if _BULLET_RE.match(line)]
+
+
+def _invented_bullets(cv_base_md: str, adapted_md: str) -> list[str]:
+    """Adapted bullets that don't resemble any base bullet, i.e. new claims rather than keyword edits."""
+    base = _bullets(cv_base_md)
+    return [
+        b
+        for b in _bullets(adapted_md)
+        if max((SequenceMatcher(None, b, src).ratio() for src in base), default=0.0) < _BULLET_MATCH_MIN
+    ]
 
 
 def _build_proposal_prompt(profile: dict, listing: Listing, language: str, contact_name: str) -> str:
     notes = (profile.get("scorer_notes") or "").strip()
     user_pref_block = ""
     if notes:
-        user_pref_block = (
-            "# User preferences (mandatory — apply when drafting)\n\n"
-            f"{notes}\n\n"
-        )
+        user_pref_block = "# User preferences (mandatory — apply when drafting)\n\n" f"{notes}\n\n"
     return (
         _PROMPT_PROP.replace("{{candidate_block}}", render_candidate_block(profile))
         .replace("{{user_pref_block}}", user_pref_block)
@@ -136,7 +154,7 @@ def main() -> None:
         listing_id = str(row["id"])
         try:
             draft_one(Listing.model_validate(row))
-        except Exception as exc:  # noqa: BLE001 — survive the loop
+        except Exception as exc:
             log.error("draft failed for %s: %s", listing_id, exc)
 
 
