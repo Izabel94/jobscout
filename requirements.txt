@@ -18,6 +18,8 @@ beautifulsoup4>=4.12,<5
 typing-extensions>=4.0,<5
 # CV export: Typst renders the CV to PDF (prebuilt wheels, no system libs).
 typst==0.15.2
+# Counts pages so a CV that just overflows can be tightened onto one page.
+pypdf>=4.0,<5.0
 # CV photo upload in Settings: resize + JPEG-encode (also a streamlit dependency).
 pillow>=12,<13
 # Intentionally NO lxml — Streamlit Cloud lacks libxml2-dev system packages
