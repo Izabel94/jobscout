@@ -111,13 +111,24 @@ def load_spam_rules() -> dict[str, Any]:
         return cast(dict[str, Any], yaml.safe_load(f))
 
 
-def synthesize_cv_markdown_from_profile(profile: dict[str, Any]) -> str:
+_CV_LABELS = {
+    "en": {"summary": "Summary", "experience": "Experience", "education": "Education", "skills": "Skills",
+           "present": "present"},
+    "de": {"summary": "Profil", "experience": "Berufserfahrung", "education": "Ausbildung", "skills": "Kenntnisse",
+           "present": "Heute"},
+}
+
+
+def synthesize_cv_markdown_from_profile(profile: dict[str, Any], language: str = "en") -> str:
     """Build a CV-shaped markdown from the structured profiles row (LinkedIn scrape).
+
+    Headings and "present" follow `language` — the draft prompt keeps headings
+    verbatim, so English ones would end up on German CVs.
 
     Used as the final fallback in `load_cv_markdown` when neither an env-var
     override, nor a `config/cv_base_*.md` file, nor `profile.cv_markdown` is
     available. Matches the `### Company | Location` + `**Role** | *Dates*`
-    convention `cv_render.py` and `config/templates/cv.html.j2` expect.
+    convention `cv_render.parse_cv` expects.
     """
     name = profile.get("full_name") or "Candidate"
     email = profile.get("email") or ""
@@ -129,20 +140,23 @@ def synthesize_cv_markdown_from_profile(profile: dict[str, Any]) -> str:
     skills = profile.get("skills") or []
     positions = profile.get("positions") or []
     education = profile.get("education") or []
+    labels = _CV_LABELS["de" if language.lower().startswith("de") else "en"]
 
     contact_bits = [b for b in (email, phone, f"<{linkedin}>" if linkedin else "") if b]
     lines: list[str] = [f"# {name}", "", " · ".join(contact_bits), ""]
     if headline:
         lines += [f"**{headline}**", ""]
     if summary:
-        lines += ["## Summary", "", summary, ""]
+        lines += [f"## {labels['summary']}", "", summary, ""]
     if positions:
-        lines += ["## Experience", ""]
+        lines += [f"## {labels['experience']}", ""]
         for p in positions:
             company = (p.get("company") or "").strip()
             title = (p.get("title") or "").strip()
             start = (p.get("start") or "").strip()
             end = (p.get("end") or "").strip()
+            if end.lower() == "present":
+                end = labels["present"]
             dates = f"{start} – {end}" if start or end else ""
             desc = (p.get("description") or "").strip()
             if location and company:
@@ -158,7 +172,7 @@ def synthesize_cv_markdown_from_profile(profile: dict[str, Any]) -> str:
             if desc:
                 lines += [desc, ""]
     if education:
-        lines += ["## Education", ""]
+        lines += [f"## {labels['education']}", ""]
         for e in education:
             school = (e.get("school") or "").strip()
             degree = (e.get("degree") or "").strip()
@@ -172,7 +186,7 @@ def synthesize_cv_markdown_from_profile(profile: dict[str, Any]) -> str:
                 lines += [f"**{degree}**"]
             lines += [""]
     if skills:
-        lines += ["## Skills", "", ", ".join(skills), ""]
+        lines += [f"## {labels['skills']}", "", ", ".join(skills), ""]
     return "\n".join(lines)
 
 
@@ -196,4 +210,4 @@ def load_cv_markdown(language: str) -> str:
     profile = _load_profile_cached()
     if cv_md := (profile.get("cv_markdown") or "").strip():
         return cv_md
-    return synthesize_cv_markdown_from_profile(profile)
+    return synthesize_cv_markdown_from_profile(profile, language)
