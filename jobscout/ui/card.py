@@ -25,7 +25,7 @@ from jobscout.models import ApplyMethod, Arrangement, JobType, ListingStatus
 
 @st.cache_data(show_spinner=False)
 def _cv_pdf(cv_md: str) -> bytes:
-    """Cached CV→PDF (fpdf2) so it renders once per unique CV, not every rerun."""
+    """Cached CV→PDF (Typst) so it renders once per unique CV, not every rerun."""
     from jobscout.cv_render import cv_markdown_to_pdf_bytes
 
     return cv_markdown_to_pdf_bytes(cv_md)
@@ -425,7 +425,7 @@ def _tab_cv(listing: dict[str, Any], draft: dict[str, Any] | None) -> None:
     _, edited_cv = _edits(listing, draft)
     with st.container(horizontal=True, gap="small"):
         _save_edits_button(listing, draft, "cv")
-        # Direct CV PDF (fpdf2, pure Python, renders on Cloud) for listings you apply to by hand.
+        # Direct CV PDF (Typst, prebuilt wheel, renders on Cloud) for listings you apply to by hand.
         st.download_button(
             "CV as PDF",
             _cv_pdf(edited_cv),
