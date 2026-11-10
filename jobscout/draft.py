@@ -91,6 +91,30 @@ def _build_proposal_prompt(profile: dict, listing: Listing, language: str, conta
     )
 
 
+_CV_ATTEMPTS = 2
+
+
+def _adapt_cv(cv_base_md: str, rendered_cv: str) -> str:
+    """Listing-adapted CV that passes `_verify_cv_facts`; after `_CV_ATTEMPTS` failures, the base CV unchanged.
+
+    The adaptation model varies run to run, so one retry usually passes. Falling back to the base CV keeps
+    the cover letter instead of failing the whole draft — an unadapted CV is always truthful.
+    """
+    for _ in range(_CV_ATTEMPTS):
+        cv_md = call_text(
+            model=_MODEL_CV,
+            fallback_model=_MODEL_DRAFT_FALLBACK,
+            system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
+            user=rendered_cv,
+            max_tokens=10000,
+        )
+        violations = _verify_cv_facts(cv_base_md, cv_md)
+        if not violations:
+            return cv_md
+        log.warning("CV adaptation rejected: %s", violations)
+    return cv_base_md
+
+
 def draft_one(listing: Listing) -> Draft:
     profile = load_profile()
     cv_language = listing.language or "de"
@@ -115,16 +139,7 @@ def draft_one(listing: Listing) -> Draft:
         )
     except LLMProviderError:
         body = call_text(model=_MODEL_CV, system="You write cover letters.", user=rendered_prop, max_tokens=3000)
-    cv_md = call_text(
-        model=_MODEL_CV,
-        system="You preserve every fact exactly and make only surgical, listing-aligned edits.",
-        user=rendered_cv,
-        max_tokens=10000,
-    )
-
-    violations = _verify_cv_facts(cv_base_md, cv_md)
-    if violations:
-        raise ValueError(f"CV adaptation broke fact preservation: {violations}")
+    cv_md = _adapt_cv(cv_base_md, rendered_cv)
     if listing.id is None:
         raise ValueError("listing.id is None — cannot persist draft")
 

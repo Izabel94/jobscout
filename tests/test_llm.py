@@ -107,3 +107,23 @@ def test_call_json_passes_fallback_model(monkeypatch):
 
     monkeypatch.setattr(llm, "_provider", lambda: provider)
     assert llm.call_json(model="primary", system="s", user="u", fallback_model="backup") == {"ok": True}
+
+
+def test_daily_quota_goes_straight_to_the_fallback_model_without_waiting(monkeypatch):
+    import jobscout.llm as llm
+
+    monkeypatch.setattr(llm, "_retryable_excs", lambda: (_FakeAPIError,))
+    waits: list[float] = []
+    monkeypatch.setattr(llm.time, "sleep", waits.append)
+    seen: list[str] = []
+
+    def provider(*, model, system, user, max_tokens):
+        seen.append(model)
+        if model == "primary":
+            raise _FakeAPIError("429 RESOURCE_EXHAUSTED {'retryDelay': '39260s'}")
+        return "ok-from-fallback"
+
+    monkeypatch.setattr(llm, "_provider", lambda: provider)
+    assert llm.call_text(model="primary", system="s", user="u", fallback_model="backup") == "ok-from-fallback"
+    assert seen == ["primary", "backup"]
+    assert waits == []

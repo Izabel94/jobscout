@@ -77,6 +77,7 @@ def _provider_name() -> str:
 
 _RATE_LIMIT_RETRY_DELAY_RE = re.compile(r"'retryDelay':\s*'(\d+)s'")
 _ATTEMPTS_PER_MODEL = 3
+_MAX_WAIT_SECONDS = 90.0
 
 
 def _rate_limit_wait_seconds(err: BaseException) -> float | None:
@@ -111,6 +112,8 @@ def _call_one_model(provider: _ProviderFn, *, model: str, system: str, user: str
             if attempt == _ATTEMPTS_PER_MODEL - 1:
                 break
             wait = _rate_limit_wait_seconds(e) or _server_error_wait(e, attempt) or float(2**attempt)
+            if wait > _MAX_WAIT_SECONDS:
+                break  # a daily quota asks for hours; hand over to the fallback model instead
             time.sleep(wait)
     raise LLMProviderError(f"LLM call to {model} failed after {_ATTEMPTS_PER_MODEL} attempts: {last_err}") from last_err
 
