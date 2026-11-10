@@ -22,10 +22,7 @@ def fake_external_apply(monkeypatch):
 
 @pytest.fixture
 def fake_render_cv(monkeypatch, tmp_path):
-    """Replace cv_render.cv_markdown_to_pdf with a no-op that produces a file."""
-    def _render(cv_md, out, *, page=None):
-        out.write_bytes(b"%PDF-1.4 stub")
-        return out
+    """Replace the worker's CV and cover-letter renderers with stubs."""
     monkeypatch.setattr("jobscout.apply.worker._render_cv_pdf", lambda md_, **kw: tmp_path / "cv.pdf")
     monkeypatch.setattr("jobscout.apply.worker._render_cover_letter_pdf", lambda md_, **kw: tmp_path / "cl.pdf")
     (tmp_path / "cv.pdf").write_bytes(b"%PDF-1.4 stub")

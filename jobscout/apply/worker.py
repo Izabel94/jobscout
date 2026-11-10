@@ -117,15 +117,11 @@ def _render_cv_pdf(cv_markdown: str, **_kwargs: object) -> Path:
     candidate's name on the attachment, not the tool name. The random suffix
     keeps successive queued applies for the same listing from colliding.
     """
-    from jobscout.cv_render import cv_markdown_to_pdf
+    from jobscout.cv_render import cv_markdown_to_pdf_bytes
 
     suffix = secrets.token_hex(4)  # 8 hex chars, ~32 bits of entropy — plenty for filename uniqueness
     out = Path(tempfile.gettempdir()) / f"{_candidate_name_slug()}_{suffix}.pdf"
-    page = _open_render_tab()
-    try:
-        cv_markdown_to_pdf(cv_markdown, out, page=page)
-    finally:
-        _close_render_tab(page)
+    out.write_bytes(cv_markdown_to_pdf_bytes(cv_markdown))
     return out
 
 

@@ -15,8 +15,7 @@ beautifulsoup4>=4.12,<5.0
 lxml>=5.3,<6.0
 httpx>=0.27,<0.28
 pyyaml>=6.0,<7.0
-jinja2>=3.1,<4.0
-markdown>=3.7,<4.0
+typst==0.15.2
 streamlit>=1.40,<2.0
 # Pin numpy/pandas to versions that ship prebuilt cp313 Windows wheels. Left
 # unpinned, the resolver picks pandas 3.x, which drags numpy down to a sdist-only
