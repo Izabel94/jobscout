@@ -52,3 +52,30 @@ def test_load_profile_raises_when_env_unset(monkeypatch):
     clear_profile_cache()
     with pytest.raises(RuntimeError, match="JOBSCOUT_PROFILE_LINKEDIN_URL"):
         load_profile()
+
+
+_SYNTH_PROFILE = {
+    "full_name": "A",
+    "summary": "Kurzprofil",
+    "skills": ["SEO"],
+    "positions": [{"company": "Acme", "title": "Lead", "start": "2020-01", "end": "present"}],
+    "education": [{"school": "Uni", "degree": "BSc", "year": "2019"}],
+}
+
+
+def test_synthesized_german_cv_uses_german_headings_and_heute():
+    from jobscout.config_loader import synthesize_cv_markdown_from_profile
+
+    md = synthesize_cv_markdown_from_profile(_SYNTH_PROFILE, "de")
+    headings = [line for line in md.splitlines() if line.startswith("## ")]
+    assert headings == ["## Profil", "## Berufserfahrung", "## Ausbildung", "## Kenntnisse"]
+    assert "*2020-01 – Heute*" in md
+
+
+def test_synthesized_english_cv_keeps_english_headings():
+    from jobscout.config_loader import synthesize_cv_markdown_from_profile
+
+    md = synthesize_cv_markdown_from_profile(_SYNTH_PROFILE, "en")
+    headings = [line for line in md.splitlines() if line.startswith("## ")]
+    assert headings == ["## Summary", "## Experience", "## Education", "## Skills"]
+    assert "*2020-01 – present*" in md
