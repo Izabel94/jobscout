@@ -94,14 +94,26 @@ def test_draft_one_persists_and_updates_status(mock_call, mock_write, mock_updat
 @patch("jobscout.draft.update_listing_status")
 @patch("jobscout.draft.write_draft")
 @patch("jobscout.draft.call_text")
-def test_draft_one_raises_when_employer_header_drops(mock_call, mock_write, mock_update):
-    mock_call.side_effect = ["cover letter body", "# Someone\n\nGeneric content with no facts.\n"]
+def test_draft_one_keeps_the_base_cv_when_every_adaptation_breaks_facts(mock_call, mock_write, mock_update):
+    broken = "# Someone\n\nGeneric content with no facts.\n"
+    mock_call.side_effect = ["cover letter body", broken, broken]
 
-    with pytest.raises(ValueError, match="broke fact preservation"):
-        draft_one(_listing())
+    draft = draft_one(_listing())
 
-    mock_write.assert_not_called()
-    mock_update.assert_not_called()
+    assert draft.body == "cover letter body"
+    assert draft.adapted_cv == _CV_BASE_EN
+    mock_write.assert_called_once()
+
+
+@patch("jobscout.draft.update_listing_status")
+@patch("jobscout.draft.write_draft")
+@patch("jobscout.draft.call_text")
+def test_draft_one_retries_a_rejected_cv_adaptation(mock_call, mock_write, mock_update):
+    adapted = _CV_BASE_EN.replace("Built things.", "Built things (Google Ads).")
+    mock_call.side_effect = ["cover letter body", "# Someone\n\nGeneric content.\n", adapted]
+
+    assert draft_one(_listing()).adapted_cv == adapted
+    assert mock_call.call_count == 3
 
 
 @patch("jobscout.draft.update_listing_status")
