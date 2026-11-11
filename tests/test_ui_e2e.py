@@ -10,6 +10,7 @@ opens that job. Skips when Chromium isn't installed.
 from __future__ import annotations
 
 import contextlib
+import re
 import socket
 import subprocess
 import sys
@@ -311,15 +312,20 @@ def test_drafting_fills_letter_and_cv_and_unlocks_apply(app_url: str, browser) -
     page.close()
 
 
-def test_cv_pdf_downloads_a_real_pdf(app_url: str, browser) -> None:  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize(
+    ("tab", "button", "prefix"),
+    [("CV", "CV as PDF", "lebenslauf"), ("Cover letter", "Cover letter as PDF", "anschreiben")],
+)
+def test_pdf_downloads_a_real_named_pdf(app_url: str, browser, tab: str, button: str, prefix: str) -> None:  # type: ignore[no-untyped-def]
     page = _open(browser, app_url)  # l0 has a draft
     _select_row(page, "l0")
-    page.get_by_role("tab", name="CV").click()
+    page.get_by_role("tab", name=tab).click()
     _wait_until_idle(page)
     with page.expect_download() as download:
-        page.get_by_role("button", name="CV as PDF").click()
+        page.get_by_role("button", name=button).click()
     pdf = Path(download.value.path()).read_bytes()
     assert pdf.startswith(b"%PDF") and len(pdf) > 1000
+    assert re.fullmatch(rf"{prefix}-[a-z-]+-\d{{4}}-\d{{2}}-\d{{2}}\.pdf", download.value.suggested_filename)
     page.close()
 
 

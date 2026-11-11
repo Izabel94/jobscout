@@ -1,12 +1,19 @@
 import base64
 import re
+from datetime import date
 from io import BytesIO
 
 import pytest
 from PIL import Image
 from pypdf import PdfReader
 
-from jobscout.cv_render import cv_markdown_to_pdf_bytes, inline_segments, parse_cv
+from jobscout.cv_render import (
+    cover_letter_to_pdf_bytes,
+    cv_markdown_to_pdf_bytes,
+    inline_segments,
+    parse_cv,
+    pdf_filename,
+)
 
 CV = """# Julian Engelke
 
@@ -170,3 +177,33 @@ def test_cv_that_just_overflows_is_tightened_onto_one_page(monkeypatch):
 def test_genuinely_long_cv_keeps_regular_layout_across_pages():
     pdf = cv_markdown_to_pdf_bytes(_cv_with_bullets(80))
     assert _pages(pdf) >= 2
+
+
+def test_cover_letter_pdf_keeps_text_and_line_breaks_including_typst_special_characters():
+    letter = "Sehr geehrte Damen und Herren,\n\nBudget #1: 50 $ <fast> @team [x] = 100 %\n\nViele Grüße\nJulian Engelke"
+    pdf = cover_letter_to_pdf_bytes(letter)
+    assert pdf.startswith(b"%PDF")
+    text = "".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+    assert "Budget#1:50$<fast>@team[x]=100%" in re.sub(r"\s+", "", text)
+    assert re.search(r"Grüße\s*\n\s*Julian", text)  # sign-off keeps its own line
+
+
+EN = "Results-driven consultant with a focus on media and the planning of campaigns for clients."
+DE = "Beratung bei der Konzeption und Umsetzung von Kampagnen für Kunden sowie Partner."
+
+
+@pytest.mark.parametrize(
+    ("full_name", "kind", "text", "expected"),
+    [
+        ("Julian Engelke", "cv", EN, "cv-julian-engelke-2026-11-11.pdf"),
+        ("Julian Engelke", "cv", DE, "lebenslauf-julian-engelke-2026-11-11.pdf"),
+        ("Julian Engelke", "cover-letter", EN, "cover-letter-julian-engelke-2026-11-11.pdf"),
+        ("Julian Engelke", "cover-letter", DE, "anschreiben-julian-engelke-2026-11-11.pdf"),
+        ("  Jürgen O'Brien-Weiß ", "cv", EN, "cv-juergen-o-brien-weiss-2026-11-11.pdf"),
+        ("Zoë Šimić", "cv", EN, "cv-zoe-simic-2026-11-11.pdf"),
+        (None, "cv", EN, "cv-2026-11-11.pdf"),
+    ],
+)
+def test_pdf_filename_uses_document_language_profile_name_and_date(monkeypatch, full_name, kind, text, expected):
+    monkeypatch.setattr("jobscout.cv_render.load_profile", lambda: {"full_name": full_name})
+    assert pdf_filename(kind, text, date(2026, 11, 11)) == expected

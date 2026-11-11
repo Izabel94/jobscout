@@ -55,7 +55,6 @@ def test_process_one_dispatches_external_apply_listing(fake_external_apply, fake
         "_record_submission_and_mark_done",
         lambda req_id, listing_id, draft_id: record_calls.append((req_id, listing_id, draft_id)),
     )
-    monkeypatch.setattr(worker, "_open_render_tab", lambda: MagicMock())
 
     row = {"id": "req-1", "listing_id": "listing-1", "source": "linkedin"}
     worker.process_one(row)
@@ -92,7 +91,6 @@ def test_process_one_prefers_job_url_direct_over_company_url_direct(
     monkeypatch.setattr(worker, "_fetch_listing", lambda _: listing)
     monkeypatch.setattr(worker, "_fetch_latest_draft", lambda _: draft)
     monkeypatch.setattr(worker, "_record_submission_and_mark_done", lambda *a: None)
-    monkeypatch.setattr(worker, "_open_render_tab", lambda: MagicMock())
 
     worker.process_one({"id": "req", "listing_id": "listing-1", "source": "indeed"})
 
@@ -118,7 +116,6 @@ def test_process_one_falls_back_to_listing_url_when_no_raw_signals(
     monkeypatch.setattr(worker, "_fetch_listing", lambda _: listing)
     monkeypatch.setattr(worker, "_fetch_latest_draft", lambda _: draft)
     monkeypatch.setattr(worker, "_record_submission_and_mark_done", lambda *a: None)
-    monkeypatch.setattr(worker, "_open_render_tab", lambda: MagicMock())
 
     worker.process_one({"id": "req", "listing_id": "listing-1", "source": "indeed"})
 
