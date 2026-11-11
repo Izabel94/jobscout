@@ -1,4 +1,4 @@
-"""Render CV markdown to an A4 PDF with Typst; render the cover letter via Chrome.
+"""Render CV markdown and the cover letter to A4 PDFs with Typst.
 
 The CV markdown convention (written by the draft step and by
 `config_loader.synthesize_cv_markdown_from_profile`):
@@ -19,24 +19,23 @@ Streamlit download and the apply worker produce the same PDF on every machine.
 from __future__ import annotations
 
 import base64
-import html as html_lib
 import io
 import json
 import re
 import tempfile
+import unicodedata
+from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Literal
 
 import typst
 from pypdf import PdfReader
 
 from jobscout.config_loader import load_profile
 
-if TYPE_CHECKING:
-    from playwright.sync_api import Page
-
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 _TEMPLATE_PATH = _CONFIG_DIR / "templates" / "cv.typ"
+_LETTER_TEMPLATE_PATH = _CONFIG_DIR / "templates" / "cover_letter.typ"
 _FONTS_DIR = _CONFIG_DIR / "fonts"
 
 _INLINE_RE = re.compile(
@@ -248,12 +247,13 @@ _FIT_PRESETS = ({"size": 9.5, "gap": 1.0}, {"size": 9.25, "gap": 0.8}, {"size": 
 
 def _compile(root: Path, data: dict[str, Any], fit: dict[str, float]) -> bytes:
     (root / "data.json").write_text(json.dumps({**data, "fit": fit}, ensure_ascii=False), encoding="utf-8")
+    return _typst_pdf(root / "cv.typ")
+
+
+def _typst_pdf(entry: Path) -> bytes:
+    """Compile with only the bundled fonts, so every machine renders the same PDF."""
     pdf = typst.compile(
-        str(root / "cv.typ"),
-        root=str(root),
-        font_paths=[str(_FONTS_DIR)],
-        ignore_system_fonts=True,
-        format="pdf",
+        str(entry), root=str(entry.parent), font_paths=[str(_FONTS_DIR)], ignore_system_fonts=True, format="pdf"
     )
     return bytes(pdf)
 
@@ -262,17 +262,36 @@ def _page_count(pdf: bytes) -> int:
     return len(PdfReader(io.BytesIO(pdf)).pages)
 
 
-_COVER_LETTER_HTML = (
-    "<html><head><meta charset='utf-8'><style>"
-    "body{font-family:Helvetica,Arial,sans-serif;font-size:11pt;line-height:1.5;"
-    "margin:2.5cm;white-space:pre-wrap;}</style></head><body>__BODY__</body></html>"
-)
+def cover_letter_to_pdf_bytes(cover_letter: str) -> bytes:
+    """Render the plain-text cover letter to A4 PDF bytes, in the CV's font."""
+    blocks = re.split(r"\n\s*\n", (cover_letter or "").strip())
+    data = {
+        "title": "Cover letter",
+        "author": load_profile().get("full_name") or "",
+        "lang": _guess_lang(cover_letter or ""),
+        "paragraphs": [[line.strip() for line in b.splitlines()] for b in blocks if b.strip()],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "letter.typ").write_bytes(_LETTER_TEMPLATE_PATH.read_bytes())
+        (root / "data.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        return _typst_pdf(root / "letter.typ")
 
 
-def cover_letter_to_pdf(cover_letter: str, out_path: Path, *, page: Page) -> Path:
-    """Render the plain-text cover letter to an A4 PDF, for forms that want the
-    cover letter as a file upload rather than a textarea."""
-    html = _COVER_LETTER_HTML.replace("__BODY__", html_lib.escape(cover_letter or ""))
-    page.set_content(html, wait_until="networkidle")
-    page.pdf(path=str(out_path), format="A4", print_background=True)
-    return out_path
+_GERMAN_TRANSLIT = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"})
+
+
+_FILE_KIND = {
+    "cv": {"de": "lebenslauf", "en": "cv"},
+    "cover-letter": {"de": "anschreiben", "en": "cover-letter"},
+}
+
+
+def pdf_filename(kind: Literal["cv", "cover-letter"], text: str, today: date | None = None) -> str:
+    """`lebenslauf-julian-engelke-2026-11-11.pdf` / `cv-…`: named in the document's own language,
+    with the candidate's name from the profile, ASCII-folded."""
+    name = (load_profile().get("full_name") or "").translate(_GERMAN_TRANSLIT)
+    name = unicodedata.normalize("NFKD", name)
+    slug = re.sub(r"[^a-z0-9]+", "-", name.encode("ascii", "ignore").decode().lower()).strip("-")
+    parts = [_FILE_KIND[kind][_guess_lang(text)], slug, (today or date.today()).isoformat()]
+    return "-".join(p for p in parts if p) + ".pdf"

@@ -1,5 +1,5 @@
 """Apply-queue worker — claims pending apply_requests rows, renders the CV
-PDF in the CDP-attached Chrome, and dispatches to external_ats. EXTERNAL_APPLY
+and cover letter PDFs, and dispatches to external_ats. EXTERNAL_APPLY
 only; LinkedIn Easy Apply is surfaced for manual click and never reaches here.
 
 Invoked by macOS launchd via scripts/apply-worker-local.sh every 5 min.
@@ -9,9 +9,6 @@ Windows .bat + Task Scheduler equivalents land in Phase 5.
 from __future__ import annotations
 
 import logging
-import os
-import re
-import secrets
 import sys
 import tempfile
 from pathlib import Path
@@ -64,79 +61,26 @@ def _ats_url_for(listing: dict[str, Any]) -> str:
       3. listing.url  — last resort (Indeed/LinkedIn wrapper)
     """
     raw = listing.get("raw") or {}
-    return str(
-        raw.get("job_url_direct")
-        or raw.get("company_url_direct")
-        or listing["url"]
-    )
+    return str(raw.get("job_url_direct") or raw.get("company_url_direct") or listing["url"])
 
 
-def _open_render_tab():
-    """Open a throwaway tab on the CDP Chrome for cv_render to call page.pdf() on."""
-    from playwright.sync_api import sync_playwright as _spw
+def _render_cv_pdf(cv_markdown: str) -> Path:
+    """Write the adapted CV PDF as `lebenslauf|cv-<name>-<date>.pdf`, so the recipient sees the
+    candidate's name on the attachment. A fresh temp dir per apply keeps queued applies
+    from overwriting each other."""
+    from jobscout.cv_render import cv_markdown_to_pdf_bytes, pdf_filename
 
-    cdp_url = os.environ["JOBSCOUT_CDP_URL"]
-    p = _spw().start()
-    browser = p.chromium.connect_over_cdp(cdp_url)
-    context = browser.contexts[0] if browser.contexts else browser.new_context()
-    page = context.new_page()
-    page._jobscout_pw = p  # type: ignore[attr-defined]
-    page._jobscout_browser = browser  # type: ignore[attr-defined]
-    return page
-
-
-def _close_render_tab(page) -> None:
-    import contextlib
-
-    with contextlib.suppress(Exception):
-        page.close()
-    with contextlib.suppress(Exception):
-        page._jobscout_browser.close()  # type: ignore[attr-defined]
-    with contextlib.suppress(Exception):
-        page._jobscout_pw.stop()  # type: ignore[attr-defined]
-
-
-_NAME_SLUG_RE = re.compile(r"[^a-z0-9]+")
-
-
-def _candidate_name_slug() -> str:
-    """Return a lowercase ASCII slug of the candidate's full_name from the
-    profiles row — used as the CV PDF filename so the recipient sees the
-    candidate's name on the attachment, not 'jobscout-cv'."""
-    from jobscout.config_loader import load_profile
-
-    name = (load_profile().get("full_name") or "").strip().lower()
-    slug = _NAME_SLUG_RE.sub("_", name).strip("_")
-    return slug or "candidate"
-
-
-def _render_cv_pdf(cv_markdown: str, **_kwargs: object) -> Path:
-    """Render the adapted CV markdown to a PDF in temp dir, return its path.
-
-    Filename: `<candidate_name_slug>_<random>.pdf` — the recipient sees the
-    candidate's name on the attachment, not the tool name. The random suffix
-    keeps successive queued applies for the same listing from colliding.
-    """
-    from jobscout.cv_render import cv_markdown_to_pdf_bytes
-
-    suffix = secrets.token_hex(4)  # 8 hex chars, ~32 bits of entropy — plenty for filename uniqueness
-    out = Path(tempfile.gettempdir()) / f"{_candidate_name_slug()}_{suffix}.pdf"
+    out = Path(tempfile.mkdtemp(prefix="jobscout-")) / pdf_filename("cv", cv_markdown)
     out.write_bytes(cv_markdown_to_pdf_bytes(cv_markdown))
     return out
 
 
 def _render_cover_letter_pdf(cover_letter: str) -> Path:
-    """Render the cover letter to a PDF, for forms that want it as a file upload
-    rather than a textarea."""
-    from jobscout.cv_render import cover_letter_to_pdf
+    """Write the cover letter PDF, for forms that want it as a file upload."""
+    from jobscout.cv_render import cover_letter_to_pdf_bytes, pdf_filename
 
-    suffix = secrets.token_hex(4)
-    out = Path(tempfile.gettempdir()) / f"{_candidate_name_slug()}_anschreiben_{suffix}.pdf"
-    page = _open_render_tab()
-    try:
-        cover_letter_to_pdf(cover_letter, out, page=page)
-    finally:
-        _close_render_tab(page)
+    out = Path(tempfile.mkdtemp(prefix="jobscout-")) / pdf_filename("cover-letter", cover_letter)
+    out.write_bytes(cover_letter_to_pdf_bytes(cover_letter))
     return out
 
 
@@ -234,7 +178,10 @@ def main() -> int:
             break
         log.info(
             "processing apply_request %s (source=%s, %d/%d applied today)",
-            row["id"], row["source"], already_today, _DAILY_CAP,
+            row["id"],
+            row["source"],
+            already_today,
+            _DAILY_CAP,
         )
         process_one(row)
         processed += 1

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import streamlit as st
@@ -29,6 +29,19 @@ def _cv_pdf(cv_md: str) -> bytes:
     from jobscout.cv_render import cv_markdown_to_pdf_bytes
 
     return cv_markdown_to_pdf_bytes(cv_md)
+
+
+@st.cache_data(show_spinner=False)
+def _cover_letter_pdf(body: str) -> bytes:
+    from jobscout.cv_render import cover_letter_to_pdf_bytes
+
+    return cover_letter_to_pdf_bytes(body)
+
+
+def _pdf_filename(kind: Literal["cv", "cover-letter"], text: str) -> str:
+    from jobscout.cv_render import pdf_filename
+
+    return pdf_filename(kind, text)
 
 
 def score_pill_class(score: int | None) -> str:
@@ -410,8 +423,17 @@ def _tab_cover_letter(listing: dict[str, Any], draft: dict[str, Any] | None) -> 
         f"model `{draft.get('model', '?')}` · created {str(draft.get('created_at', '?'))[:16].replace('T', ' ')}"
     )
     _editor("Cover letter", draft.get("body") or "", f"body-{listing['id']}-{draft['id']}")
+    edited_body, _ = _edits(listing, draft)
     with st.container(horizontal=True, gap="small"):
         _save_edits_button(listing, draft, "letter")
+        st.download_button(
+            "Cover letter as PDF",
+            _cover_letter_pdf(edited_body),
+            icon=":material/download:",
+            file_name=_pdf_filename("cover-letter", edited_body),
+            mime="application/pdf",
+            key=f"dl-letter-{listing['id']}",
+        )
         if st.button("Draft again", key=f"redraft-{listing['id']}", help="Replaces the cover letter and CV"):
             _run_draft(listing, "re-drafted")
 
@@ -430,7 +452,7 @@ def _tab_cv(listing: dict[str, Any], draft: dict[str, Any] | None) -> None:
             "CV as PDF",
             _cv_pdf(edited_cv),
             icon=":material/download:",
-            file_name=f"cv-{listing['id'][:8]}.pdf",
+            file_name=_pdf_filename("cv", edited_cv),
             mime="application/pdf",
             key=f"dl-cv-{listing['id']}",
         )
